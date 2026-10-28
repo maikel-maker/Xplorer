@@ -52,7 +52,9 @@ jobs:
           curl -fsS "https://api.coinbase.com/api/v3/brokerage/market/products?product_type=SPOT&limit=5" | python3 -c "import sys,json; p=json.load(sys.stdin)['products']; assert p and 'product_id' in p[0]; print('Produits OK')"
 
       - name: Tests unitaires
-        run: gradle :app:testReleaseUnitTest --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          gradle :app:testReleaseUnitTest --no-daemon --console=plain 2>&1 | tee -a build.log
 
       - name: Signature
         env:
@@ -72,7 +74,9 @@ jobs:
           echo "XP_VERSION_CODE=$(( ${{ github.run_number }} + 100 ))" >> "$GITHUB_ENV"
 
       - name: Compilation APK
-        run: gradle :app:assembleRelease --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          gradle :app:assembleRelease --no-daemon --console=plain 2>&1 | tee -a build.log
 
       - name: Vérification de l'APK
         run: |
@@ -87,6 +91,12 @@ jobs:
           cp "$APK" Xplorer.apk
           ls -la Xplorer.apk
 
+      - name: Erreurs lisibles
+        if: failure()
+        run: |
+          grep -E "^e: |error:|FAILED|What went wrong|Could not|Unresolved|expected|Exception|AssertionError|at be\.maikel" build.log | head -60 | while IFS= read -r l; do echo "::error::${l:0:900}"; done || true
+          for f in $(ls app/build/test-results/testReleaseUnitTest/*.xml 2>/dev/null); do grep -A3 "<failure" "$f" | head -20 | while IFS= read -r l; do echo "::error::${l:0:900}"; done; done || true
+
       - name: Rapport des tests
         if: always()
         uses: actions/upload-artifact@v4
@@ -96,6 +106,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Publication
+        if: ${{ !contains(github.event.head_commit.message, '[no-release]') }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v2.0.${{ github.run_number }}
