@@ -1,0 +1,13 @@
+{
+  "appId": "be.maikel.xplorer",
+  "appName": "Xplorer",
+  "webDir": "www",
+  "backgroundColor": "#0B0D12",
+  "android": {
+    "adjustMarginsForEdgeToEdge": "force"
+  },
+  "plugins": {
+    "CapacitorHttp": { "enabled": true },
+    "LocalNotifications": { "iconColor": "#3DDC97" }
+  }
+}
