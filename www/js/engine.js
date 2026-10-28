@@ -327,7 +327,7 @@ export function priceDecimals(p) {
 export function fmtEur(v, d) {
   if (v == null || isNaN(v)) return '—';
   const dec = d ?? (Math.abs(v) >= 100 ? 0 : 2);
-  return v.toLocaleString('fr-BE', { minimumFractionDigits: dec, maximumFractionDigits: dec }) + ' €';
+  return v.toLocaleString('fr-BE', { minimumFractionDigits: dec, maximumFractionDigits: dec }).replace(/\s/g, '\u00A0') + '\u00A0€';
 }
 export function fmtQty(q) {
   if (q == null || isNaN(q)) return '—';
@@ -337,5 +337,5 @@ export function fmtQty(q) {
 export function fmtPct(v, sign = false) {
   if (v == null || isNaN(v)) return '—';
   const s = (v * 100).toLocaleString('fr-BE', { maximumFractionDigits: 1 });
-  return (sign && v > 0 ? '+' : '') + s + ' %';
+  return (sign && v > 0 ? '+' : '') + s + '\u00A0%';
 }

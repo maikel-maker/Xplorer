@@ -80,6 +80,32 @@ export async function histories(assets, onProgress) {
   return out;
 }
 
+// Données fines pour 1 jour (toutes les 5 min) ou 1 semaine (toutes les heures) : [{ t, c }]
+const fine = new Map();
+export async function intraday(asset, days) {
+  const key = `${asset.symbol}.${days}`;
+  const hit = fine.get(key);
+  if (hit && Date.now() - hit.at < 5 * 60000) return hit.data;
+  let data = null;
+  if (asset.cg) {
+    try {
+      const j = await json(`${CG}/coins/${encodeURIComponent(asset.cg)}/market_chart?vs_currency=eur&days=${days}`);
+      data = (j.prices || []).map(([t, c]) => ({ t, c }));
+    } catch { data = null; }
+  }
+  if (!data?.length) {
+    try {
+      const g = days <= 1 ? 300 : 3600;
+      const rows = await json(`${CBX}/products/${asset.symbol}-EUR/candles?granularity=${g}`);
+      const cut = Date.now() - days * DAY;
+      data = rows.map(r => ({ t: r[0] * 1000, c: r[4] })).filter(p => p.t >= cut).reverse();
+    } catch { data = null; }
+  }
+  data = data || [];
+  if (data.length) fine.set(key, { at: Date.now(), data });
+  return data;
+}
+
 export async function search(q) {
   const j = await json(`${CG}/search?query=${encodeURIComponent(q)}`);
   return (j.coins || []).slice(0, 8).map(c => ({ cg: c.id, symbol: (c.symbol || '').toUpperCase(), name: c.name, thumb: c.thumb }));

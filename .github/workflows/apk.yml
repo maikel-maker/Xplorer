@@ -28,15 +28,22 @@ jobs:
           java-version: 21
 
       - name: Tests du moteur
-        run: node test/engine.test.mjs
+        run: node test/engine.test.mjs && node test/ta.test.mjs
 
       - name: Dépendances
         run: npm install --no-audit --no-fund
 
+      - name: Polices
+        run: |
+          mkdir -p www/fonts
+          cp "$(ls node_modules/@fontsource-variable/space-grotesk/files/*-latin-wght-normal.woff2 | grep -v latin-ext | head -1)" www/fonts/space-grotesk.woff2
+          cp "$(ls node_modules/@fontsource-variable/manrope/files/*-latin-wght-normal.woff2 | grep -v latin-ext | head -1)" www/fonts/manrope.woff2
+          ls -la www/fonts
+
       - name: Projet Android
         run: |
           npx cap add android
-          npx @capacitor/assets generate --android --iconBackgroundColor '#0B0D12' --iconBackgroundColorDark '#0B0D12' --splashBackgroundColor '#0B0D12' --splashBackgroundColorDark '#0B0D12'
+          npx @capacitor/assets generate --android --iconBackgroundColor '#070B16' --iconBackgroundColorDark '#070B16' --splashBackgroundColor '#070B16' --splashBackgroundColorDark '#070B16'
           npx cap sync android
 
       - name: Version et permissions
