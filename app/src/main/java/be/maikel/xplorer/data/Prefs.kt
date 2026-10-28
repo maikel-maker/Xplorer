@@ -27,6 +27,8 @@ data class Settings(
     val maxAlertsPerDay: Int = 6,
     /** Correction manuelle du capital apporté (null = calcul automatique). */
     val capitalOverride: Double? = null,
+    /** Point de départ du suivi (ms UTC). Par défaut le 28 septembre 2026, début de la série actuelle. null = depuis l'ouverture du compte. */
+    val startDate: Long? = 1790553600000L,
 ) {
     fun maxFor(sym: String) = maxWeight[sym] ?: maxWeightDefault
 }

@@ -53,14 +53,23 @@ fun LazyListScope.homeScreen(a: Analysis?, hasKey: Boolean, onAsset: (String) ->
             } else {
                 Spacer(Modifier.height(14.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Stat("Capital apporté", Money.eur(a.capital, 0), Modifier.weight(1f), sub = if (a.capitalManual) "corrigé" else "virements")
+                    val startTxt = a.snap.settings.startDate?.let { java.text.SimpleDateFormat("d MMM", java.util.Locale.FRANCE).format(java.util.Date(it)) }
+                    Stat("Capital apporté", Money.eur(a.capital, 0), Modifier.weight(1f), sub = when {
+                        a.capitalManual -> "corrigé à la main"
+                        a.sinceStart -> "depuis le $startTxt"
+                        else -> "tous les virements"
+                    })
                     Stat("Gain ou perte", Money.signedEur(a.gain, 0), Modifier.weight(1f), if (a.gain >= 0) Xp.Gain else Xp.Loss, Money.pct(a.gainPct, true))
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Stat("Latent", Money.signedEur(l.unrealized, 0), Modifier.weight(1f), if (l.unrealized >= 0) Xp.Gain else Xp.Loss)
-                    Stat("Réalisé", Money.signedEur(l.realized, 0), Modifier.weight(1f), if (l.realized >= 0) Xp.Gain else Xp.Loss)
-                    Stat("Frais", Money.eur(l.fees, 0), Modifier.weight(1f))
+                    Stat("Réalisé", Money.signedEur(l.realized, 0), Modifier.weight(1f), if (l.realized >= 0) Xp.Gain else Xp.Loss, "depuis toujours")
+                    Stat("Frais", Money.eur(l.fees, 0), Modifier.weight(1f), sub = "depuis toujours")
+                }
+                if (a.sinceStart) {
+                    Spacer(Modifier.height(8.dp))
+                    Muted("Historique complet du compte : ${Money.eur(l.capitalNet, 0)} virés depuis l'ouverture, résultat ${Money.signedEur(a.lifetimeGain, 0)}. Change le point de départ dans Réglages.")
                 }
             }
         }
@@ -90,7 +99,7 @@ fun LazyListScope.homeScreen(a: Analysis?, hasKey: Boolean, onAsset: (String) ->
     }
     a.history?.let { h ->
         item {
-            var range by remember { mutableStateOf(2) }
+            var range by remember { mutableStateOf(3) }
             val days = listOf(30, 90, 365, Int.MAX_VALUE)[range]
             val cut = System.currentTimeMillis() - days.toLong() * 86_400_000L
             val pts = h.points.filter { days == Int.MAX_VALUE || it.t >= cut }

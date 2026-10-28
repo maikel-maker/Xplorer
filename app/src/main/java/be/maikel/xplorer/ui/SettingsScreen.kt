@@ -81,6 +81,29 @@ fun LazyListScope.settingsScreen(s: UiState, st: Settings, act: SettingsActions)
         }
     }
     item {
+        SectionTitle("Point de départ du suivi")
+        Glass {
+            val fmt = SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE).apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+            Muted("Le capital, les gains et la courbe sont comptés à partir de cette date : ce que valait ton portefeuille ce jour-là, plus tes virements depuis. L'historique d'avant reste visible à part.", small = false)
+            Spacer(Modifier.height(8.dp))
+            Text(st.startDate?.let { "Depuis le " + fmt.format(Date(it)) } ?: "Depuis l'ouverture du compte", style = MaterialTheme.typography.titleMedium, color = Xp.Ice)
+            var txt by remember(st) { mutableStateOf(st.startDate?.let { fmt.format(Date(it)) } ?: "") }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(txt, { txt = it.filter { c -> c.isDigit() || c == '/' }.take(10) }, label = { Text("Date (JJ/MM/AAAA)") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+                TextButton(onClick = { try { fmt.parse(txt)?.time?.let { t -> act.update { it.copy(startDate = t) } } } catch (e: Exception) { } }) { Text("Appliquer", color = Xp.Cyan) }
+            }
+            val day = 86_400_000L
+            val today = System.currentTimeMillis() / day * day
+            Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Pill("1 mois", false, { act.update { it.copy(startDate = today - 30 * day) } })
+                Pill("3 mois", false, { act.update { it.copy(startDate = today - 91 * day) } })
+                Pill("1 an", false, { act.update { it.copy(startDate = today - 365 * day) } })
+                Pill("Tout", st.startDate == null, { act.update { it.copy(startDate = null) } })
+            }
+        }
+    }
+    item {
         SectionTitle("Budget et risque")
         Glass {
             var weekly by remember(st) { mutableStateOf(st.weeklyBudget.toInt().toString()) }

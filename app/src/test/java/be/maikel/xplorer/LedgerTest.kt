@@ -107,4 +107,23 @@ class LedgerTest {
         val origin = h.periods.last()
         assertEquals(last.value - 1000.0, origin.gainEur, 1e-6)
     }
+
+    @Test fun startDateResetsCapitalAndPercentagesStayBounded() {
+        val ops = scenario()
+        val now = 60 * D + 5000
+        val btc = (0..60).associate { it.toLong() to 30000.0 + it * 300 }
+        val geod = (0..60).associate { it.toLong() to 0.2 }
+        val bal = mapOf("BTC" to 0.015, "GEOD" to 1010.0, "EUR" to 298.5, "USDC" to 54.0)
+        val prices = mapOf("BTC" to btc[60L]!!, "GEOD" to 0.2)
+        val h = History.build(ops, bal, mapOf("BTC" to btc, "GEOD" to geod), emptyMap(), 0.925, prices, now, startMs = 20 * D)!!
+        val first = h.points.first()
+        assertEquals(20 * D, first.t)
+        assertEquals(first.value, h.startValue!!, 1e-9)
+        // capital = valeur au départ + le virement de 500 € du jour 30
+        assertEquals(first.value + 500.0, h.points.last().capital, 1e-6)
+        val origin = h.periods.last()
+        assertTrue(origin.label.startsWith("Depuis le"))
+        assertEquals(h.points.last().value - first.value - 500.0, origin.gainEur, 1e-6)
+        h.periods.forEach { assertTrue("${it.label} ${it.pct}", it.pct.isNaN() || it.pct > -1.0) }
+    }
 }

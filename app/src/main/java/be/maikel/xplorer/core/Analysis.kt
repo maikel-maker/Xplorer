@@ -44,6 +44,9 @@ data class Analysis(
     val gainPct: Double,
     val day: Pair<Double, Double>,
     val issues: List<String>,
+    val sinceStart: Boolean = false,
+    val startValue: Double? = null,
+    val lifetimeGain: Double = 0.0,
 )
 
 object Analyzer {
@@ -53,12 +56,16 @@ object Analyzer {
         val ledger = Ledger.compute(s.ops, s.balances, s.prices, s.usdEurNow)
         val dailyClose = s.daily.mapValues { (_, c) -> c.associate { History.dayOf(it.t) to it.close } }
         val history = try {
-            History.build(s.ops, s.balances, dailyClose, s.usdEurDaily, s.usdEurNow, s.prices, now)
+            History.build(s.ops, s.balances, dailyClose, s.usdEurDaily, s.usdEurNow, s.prices, now, startMs = st.startDate)
         } catch (e: Exception) { null }
 
         val capitalManual = st.capitalOverride != null
-        val capital = st.capitalOverride ?: ledger.capitalNet
-        val gain = ledger.totalEur - capital - ledger.externalNetEur
+        // Avec un point de départ : capital = valeur du portefeuille ce jour-là + virements (et transferts) depuis.
+        val sinceStart = st.startDate != null && history?.startValue != null
+        val autoCapital = if (sinceStart) history!!.points.last().capital else ledger.capitalNet
+        val capital = st.capitalOverride ?: autoCapital
+        val gain = ledger.totalEur - capital - (if (sinceStart || capitalManual) 0.0 else ledger.externalNetEur)
+        val lifetimeGain = ledger.totalEur - ledger.capitalNet - ledger.externalNetEur
         val gainPct = if (capital > 0) gain / capital else Double.NaN
 
         val values = ledger.positions.associate { it.symbol to it.value }
@@ -88,10 +95,11 @@ object Analyzer {
         if (s.hasKey && s.totalAccounts > s.syncedAccounts)
             issues += "${s.syncedAccounts} comptes Coinbase lus sur ${s.totalAccounts} (les comptes vides et inactifs sont ignorés)."
         history?.missingPrices?.takeIf { it.isNotEmpty() }?.let { issues += "Pas d'historique de prix pour ${it.joinToString()} : exclus de la courbe passée." }
-        if (capitalManual) issues += "Capital apporté corrigé à la main : ${Money.eur(capital, 0)} (calcul automatique : ${Money.eur(ledger.capitalNet, 0)})."
+        history?.takeIf { it.jumps > 0 }?.let { issues += "${it.jumps} jour(s) incohérent(s) dans l'historique reconstruit, exclus du calcul de performance." }
+        if (capitalManual) issues += "Capital apporté corrigé à la main : ${Money.eur(capital, 0)} (calcul automatique : ${Money.eur(autoCapital, 0)})."
         if (ledger.externalNetEur != 0.0) issues += "Transferts de cryptos depuis ou vers l'extérieur : ${Money.signedEur(ledger.externalNetEur, 0)} (valeur à la date du transfert), exclus des gains."
 
-        return Analysis(s, ledger, history, recs, plan, signals, health(s, ledger, history), capital, capitalManual, gain, gainPct, dayChange to dayPct, issues)
+        return Analysis(s, ledger, history, recs, plan, signals, health(s, ledger, history), capital, capitalManual, gain, gainPct, dayChange to dayPct, issues, sinceStart, history?.startValue, lifetimeGain)
     }
 
     private fun health(s: Snapshot, l: LedgerResult, h: PortfolioHistory?): Health {

@@ -269,6 +269,10 @@ data class PortfolioHistory(
     val currentDrawdown: Double,
     val volatility: Double,
     val periods: List<Performance>,
+    /** Jours ignorés dans le calcul de performance (saut incohérent = trou d'historique). */
+    val jumps: Int = 0,
+    /** Valeur du portefeuille au point de départ choisi. */
+    val startValue: Double? = null,
 )
 
 object History {
@@ -290,6 +294,8 @@ object History {
         prices: Map<String, Double>,
         nowMs: Long,
         bench: String = "BTC",
+        /** Point de départ choisi : le capital initial devient la valeur du portefeuille ce jour-là. */
+        startMs: Long? = null,
     ): PortfolioHistory? {
         if (ops.isEmpty()) return null
         val sorted = ops.sortedBy { it.t }
@@ -328,11 +334,15 @@ object History {
         }
 
         val points = mutableListOf<HistoryPoint>()
+        val startDay = startMs?.let { dayOf(it) }?.coerceIn(firstDay, today)
         var capital = 0.0
         var benchUnits = 0.0
         var twr = 1.0
         var prevV = 0.0
+        var jumps = 0
+        var started = startDay == null
         for (d in days) {
+            if (startDay != null && d < startDay) continue
             val q = qtyAtEnd[d] ?: emptyMap()
             var v = 0.0
             for ((c, n) in q) {
@@ -341,13 +351,23 @@ object History {
                 if (p == null) { if (n > 0) missing += c; continue }
                 v += n * p
             }
+            val bp = px(bench, d)
+            if (!started) {
+                // Jour de départ : ce que valait le portefeuille devient le capital initial.
+                started = true
+                capital = v
+                benchUnits = if (bp != null && bp > 0) v / bp else 0.0
+                prevV = v
+                points += HistoryPoint(d * DAY, v, capital, if (bp != null) benchUnits * bp else Double.NaN, twr, v)
+                continue
+            }
             val f = flowsByDay[d] ?: 0.0
             capital += f
-            val bp = px(bench, d)
             if (bp != null && bp > 0) benchUnits = max(0.0, benchUnits + f / bp)
-            if (prevV > 0.01) {
+            if (prevV >= 10.0) {
                 val r = (v - f) / prevV
-                if (r > 0 && r < 20) twr *= r
+                // Un saut de plus de x3 ou de −70 % en un jour = trou dans l'historique, pas une performance.
+                if (r in 0.3..3.0) twr *= r else jumps++
             }
             prevV = v
             points += HistoryPoint(d * DAY, v, capital, if (bp != null) benchUnits * bp else Double.NaN, twr, f)
@@ -358,31 +378,35 @@ object History {
         var peak = 0.0; var mdd = 0.0
         for (p in trimmed) { peak = max(peak, p.twr); if (peak > 0) mdd = minOf(mdd, p.twr / peak - 1) }
         val cur = trimmed.last().twr / (trimmed.maxOf { it.twr }) - 1
-        val rets = trimmed.zipWithNext { a, b -> if (a.twr > 0) b.twr / a.twr - 1 else 0.0 }.takeLast(365)
+        val rets = trimmed.zipWithNext { a, b -> if (a.twr > 0 && a.value >= 10.0) b.twr / a.twr - 1 else null }.filterNotNull().takeLast(365)
         val vol = if (rets.size > 10) {
             val m = rets.average(); sqrt(rets.sumOf { (it - m) * (it - m) } / (rets.size - 1)) * sqrt(365.0)
         } else Double.NaN
 
-        val periods = listOf("7 jours" to 7, "30 jours" to 30, "1 an" to 365, "Depuis le début" to Int.MAX_VALUE)
-            .map { (label, n) -> period(trimmed, n, label) }
-        return PortfolioHistory(trimmed, missing, mdd, cur, vol, periods)
+        val originLabel = if (startDay != null) "Depuis le " + java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.FRANCE).format(java.util.Date(startDay * DAY)) else "Depuis le début"
+        val periods = listOf("7 jours" to 7, "30 jours" to 30, "1 an" to 365, originLabel to Int.MAX_VALUE)
+            .filter { (_, n) -> n == Int.MAX_VALUE || n < trimmed.size }
+            .map { (label, n) -> period(trimmed, n, label, fromStart = startDay != null) }
+        return PortfolioHistory(trimmed, missing, mdd, cur, vol, periods, jumps, trimmed.first().capital.takeIf { startDay != null })
     }
 
     /** Performance d'une période par la méthode de Dietz modifiée (les dépôts ne sont pas des gains). */
-    fun period(p: List<HistoryPoint>, n: Int, label: String): Performance {
+    /**
+     * Performance d'une période. Euros : valeur finale − valeur initiale − virements (les dépôts ne sont pas des gains).
+     * Pourcentage : rendement pondéré dans le temps, qui ne peut pas descendre sous −100 %.
+     */
+    fun period(p: List<HistoryPoint>, n: Int, label: String, fromStart: Boolean = false): Performance {
         val end = p.size - 1
-        val s = if (n >= p.size) 0 else end - n
-        val v0 = if (n >= p.size) 0.0 else p[s].value
-        var flows = 0.0; var weighted = 0.0
-        val from = if (n >= p.size) 0 else s + 1
-        val span = (end - (from - 1)).coerceAtLeast(1)
-        for (i in from..end) {
-            flows += p[i].flow
-            weighted += p[i].flow * (end - i).toDouble() / span
-        }
+        val whole = n >= p.size
+        val s = if (whole) 0 else end - n
+        // Période entière avec point de départ : la valeur du premier jour est le capital initial.
+        val v0 = if (whole && !fromStart) 0.0 else p[s].value
+        val from = if (whole && !fromStart) 0 else s + 1
+        var flows = 0.0
+        for (i in from..end) flows += p[i].flow
         val gain = p[end].value - v0 - flows
-        val denom = v0 + weighted
-        return Performance(label, gain, if (abs(denom) > 1e-9) gain / denom else Double.NaN)
+        val pct = if (p[s].twr > 0) p[end].twr / p[s].twr - 1 else Double.NaN
+        return Performance(label, gain, pct)
     }
 
     private fun nearest(m: Map<Long, Double>, d: Long): Double? {
