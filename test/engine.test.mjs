@@ -79,4 +79,15 @@ console.log('Moteur : tous les tests passent ✓');
   const r3 = E.portfolioVsMarket({ GEOD: 100 }, [], hist, t0, { BTC: 200, GEOD: 1 });
   assert.ok(r3.marketNow > r3.mineNow);
 }
+{
+  const D = 86400000, t0 = Date.now() - 10 * D;
+  const hist = { BTC: Array.from({ length: 10 }, (_, i) => ({ t: t0 + i * D, c: 100 })) };
+  const fills = [
+    { t: t0 - 30 * D, symbol: 'BTC', quote: 'EUR', side: 'BUY', qty: 5, eurPrice: 100, fee: 1 },
+    { t: t0 + 3 * D, symbol: 'BTC', quote: 'EUR', side: 'SELL', qty: 1, eurPrice: 100, fee: 1 },
+  ];
+  const r = E.portfolioVsMarket({ BTC: 4 }, fills, hist, t0, { BTC: 100 }, 'BTC', 50);
+  assert.equal(Math.round(r.investedNow), 50 + 501 - 99, 'versé = base + achats et frais - ventes nettes');
+  assert.equal(Math.round(r.invested[0].v), 551, 'avant la vente');
+}
 console.log('Toi face au marché : tests passent ✓');

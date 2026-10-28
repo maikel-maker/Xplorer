@@ -234,21 +234,31 @@ function viewHome(d) {
   } else {
     const ch = d.change24;
     const nowPx = Object.fromEntries(Object.entries(st.prices).map(([k, v]) => [k, v.eur]));
-    const perf = E.portfolioVsMarket(d.holdings, d.fillsEur, st.hist, cutFor(st.perfRange), nowPx);
-    const periods = { '1M': 'Sur 1 mois', '3M': 'Sur 3 mois', '1A': 'Sur 1 an', 'Tout': 'Depuis le début de l\'historique' };
+    const perf = E.portfolioVsMarket(d.holdings, d.fillsEur, st.hist, cutFor(st.perfRange), nowPx, 'BTC', st.settings.investedBase || 0);
+    const periods = { '1M': 'Sur 1 mois', '3M': 'Sur 3 mois', '1A': 'Sur 1 an', 'Tout': 'Sur tout l\'historique' };
     let perfBlock = '';
     if (perf) {
-      const diff = perf.mineNow - perf.marketNow;
+      const gain = perf.mineNow - perf.investedNow;
+      const gainPct = perf.investedNow > 0 ? gain / perf.investedNow : null;
+      const btcGain = perf.marketNow - perf.mine[0].v - perf.investedInPeriod;
+      const myGain = perf.mineNow - perf.mine[0].v - perf.investedInPeriod;
+      const diff = myGain - btcGain;
       const tie = Math.abs(diff) < Math.max(1, perf.mineNow * 0.002);
-      perfBlock = `<div class="vs">
+      perfBlock = `<div class="stats">
+          <div><span>Argent investi</span><b>${fmtEur(perf.investedNow, 0)}</b></div>
+          <div><span>Valeur aujourd'hui</span><b>${fmtEur(perf.mineNow, 0)}</b></div>
+          <div><span>Gain ou perte</span><b class="${gain >= 0 ? 'up' : 'down'}">${gain >= 0 ? '+' : '−'}${fmtEur(Math.abs(gain), 0)}${gainPct != null ? ` <small>${fmtPct(gainPct, true)}</small>` : ''}</b></div>
+        </div>
+        <div class="vs">
         <div class="vs-head"><h2>Toi face au marché</h2>${seg(['1M', '3M', '1A', 'Tout'], st.perfRange, 'perf', 'sm')}</div>
-        ${lineChart({ height: 150, label: 'Toi face au marché', series: [
+        ${lineChart({ height: 160, label: 'Toi face au marché', series: [
           { name: 'Toi', points: perf.mine, color: 'var(--cyan)', fill: true },
           { name: 'Tout en BTC', points: perf.market, color: 'var(--gold)', width: 1.6 },
+          { name: 'Investi', points: perf.invested, color: 'var(--slate)', width: 1.4, dash: '4 4' },
         ] })}
-        <div class="legend"><span><i style="background:var(--cyan)"></i>Ton portefeuille</span><span><i style="background:var(--gold)"></i>Si tout avait été en BTC</span></div>
+        <div class="legend"><span><i style="background:var(--cyan)"></i>Ton portefeuille</span><span><i style="background:var(--gold)"></i>Même argent en BTC</span><span><i style="background:var(--slate)"></i>Argent investi</span></div>
         <p class="verdict ${diff >= 0 ? 'up' : 'down'}">${periods[st.perfRange]}, ${tie ? 'tu fais jeu égal avec le BTC.' : `${diff >= 0 ? 'tu fais mieux que le BTC de' : 'le BTC fait mieux que toi de'} <b>${fmtEur(Math.abs(diff))}</b>.`}</p>
-        <p class="muted small">Ta courbe part de ce que tu avais en début de période. Les cryptos reçues sans achat (récompenses, transferts) comptent comme un gain.</p>
+        <p class="muted small">L'argent investi, c'est tous tes achats Coinbase (frais compris) moins tes ventes${st.settings.investedBase ? `, plus ${fmtEur(st.settings.investedBase, 0)} investis ailleurs` : ''}. Si tu avais des cryptos d'ailleurs, ajoute ce que tu as payé dans Réglages.</p>
       </div>`;
     }
     hero = `<section class="hero glass">
@@ -489,6 +499,13 @@ function viewSettings() {
       <form data-form="search" class="alert-form"><input name="q" placeholder="Ajouter une crypto, par ex. SOL" autocapitalize="off"><button class="btn sm">Chercher</button></form>
       ${results}
     </section>
+    <section class="card glass"><h3>Argent investi ailleurs</h3>
+      <p class="muted small">Xplorer compte tout seul tes achats Coinbase. Si tu as acheté des cryptos ailleurs ou avant, indique ici combien tu as payé au total.</p>
+      <form class="amount" data-form="base">
+        <input name="base" type="number" min="0" step="1" inputmode="decimal" value="${s.investedBase || 0}" aria-label="Argent investi ailleurs">
+        <span>€</span><button class="btn sm">Valider</button>
+      </form>
+    </section>
     <section class="card glass"><h3>Règle GEOD</h3>
       <form data-form="geod" class="geod">
         <label>Ton prix d'achat<input name="base" type="number" step="any" inputmode="decimal" value="${s.geodBase}"></label>
@@ -548,6 +565,7 @@ $app.addEventListener('submit', async ev => {
     const price = parseFloat(String(data.price).replace(',', '.'));
     if (price > 0) { st.settings.alerts.push({ id: Date.now(), symbol: f.dataset.sym, dir: data.dir, price, done: false }); S.saveSettings(st.settings); askNotifications(); render(); }
   }
+  else if (kind === 'base') { st.settings.investedBase = Math.max(0, parseFloat(String(data.base).replace(',', '.')) || 0); S.saveSettings(st.settings); render(); }
   else if (kind === 'geod') {
     st.settings.geodBase = parseFloat(String(data.base).replace(',', '.')) || st.settings.geodBase;
     st.settings.geodMult = parseFloat(data.mult) || st.settings.geodMult;

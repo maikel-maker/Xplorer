@@ -26,6 +26,7 @@ export function settings() {
   const s = load('settings', {});
   return {
     monthly: 500,
+    investedBase: 0,
     geodBase: 0.21,
     geodMult: 20,
     notifications: true,

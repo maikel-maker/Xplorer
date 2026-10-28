@@ -24,7 +24,7 @@ export function lineChart(opts) {
     const d = pts.map((p, j) => `${j ? 'L' : 'M'}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join('');
     const area = s.fill ? `<path d="${d}L${x(pts[pts.length - 1].t).toFixed(1)},${H - padB}L${x(pts[0].t).toFixed(1)},${H - padB}Z" fill="url(#${id}g${i})"/>
       <defs><linearGradient id="${id}g${i}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${s.color}" stop-opacity=".28"/><stop offset="1" stop-color="${s.color}" stop-opacity="0"/></linearGradient></defs>` : '';
-    return `${area}<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.width || 2}" stroke-linejoin="round" stroke-linecap="round"/>`;
+    return `${area}<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.width || 2}" stroke-linejoin="round" stroke-linecap="round"${s.dash ? ` stroke-dasharray="${s.dash}"` : ''}/>`;
   }).join('');
 
   const markers = (opts.markers || []).filter(m => m.t >= t0 && m.t <= t1).map(m => `

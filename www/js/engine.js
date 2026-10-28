@@ -321,7 +321,7 @@ export function performance(fills, history, bench = 'BTC') {
 // Le "marché" part de la même valeur que toi au début de la période, tout en BTC,
 // et suit les mêmes achats et ventes en euros.
 // holdings : {SYM: qty}, fills : [{t, symbol, side, qty, eurPrice}], history : {SYM: [{t, c}]}, now : {SYM: prix actuel}
-export function portfolioVsMarket(holdings, fills, history, startT, now = {}, bench = 'BTC') {
+export function portfolioVsMarket(holdings, fills, history, startT, now = {}, bench = 'BTC', base = 0) {
   const bh = history[bench];
   const syms = Object.keys(holdings).filter(s => holdings[s] > 0 && history[s]?.length);
   if (!bh?.length || !syms.length) return null;
@@ -359,8 +359,21 @@ export function portfolioVsMarket(holdings, fills, history, startT, now = {}, be
     }
     return { t: Math.min(t, nowT), v: btc * btcPx(t) };
   });
+  // Argent investi : tout ce que tu as mis (achats + frais) moins ce que tu as récupéré (ventes - frais)
+  const flow = f => {
+    const px = f.eurPrice || closeAt(f.symbol, f.t) || 0;
+    const fee = f.quote === 'EUR' ? (f.fee || 0) : 0;
+    return f.side === 'BUY' ? f.qty * px + fee : -(f.qty * px - fee);
+  };
+  const allFills = [...fills].sort((a, b) => a.t - b.t);
+  const investedAt = t => base + allFills.filter(f => f.t <= t).reduce((s, f) => s + flow(f), 0);
+  const invested = points.map(t => ({ t: Math.min(t, nowT), v: investedAt(t) }));
   const last = mine.length - 1;
-  return { mine, market, mineNow: mine[last].v, marketNow: market[last].v, start: mine[0].v };
+  return {
+    mine, market, invested,
+    mineNow: mine[last].v, marketNow: market[last].v, investedNow: invested[last].v, start: mine[0].v,
+    investedInPeriod: invested[last].v - invested[0].v,
+  };
 }
 
 // ---------- formats ----------
