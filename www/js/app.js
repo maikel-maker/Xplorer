@@ -172,6 +172,18 @@ const LOGO = `<svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient 
   <path d="M7 7l18 18" stroke="#E2B86B" stroke-width="4.2" stroke-linecap="round"/><path d="M7 25L25 7" stroke="url(#lg1)" stroke-width="4.2" stroke-linecap="round"/></svg>`;
 
 function render() {
+  try { renderInner(); }
+  catch (e) { showCrash(e); }
+}
+function showCrash(e) {
+  $app.innerHTML = `<main class="view"><header class="top"><div class="top-t"><h1>Xplorer</h1></div></header>
+    <section class="card glass"><h3>Un écran n'a pas pu s'afficher</h3>
+    <p class="muted small">Envoie une capture de ce message pour que ce soit corrigé.</p>
+    <p class="note err mono">${esc(e?.message || e)}<br>${esc((e?.stack || '').split('\n').slice(0, 3).join(' | '))}</p>
+    <button class="btn" data-act="reset-view">Revenir à l'accueil</button></section></main>`;
+}
+window.addEventListener('error', ev => { if ($app.querySelector('.boot')) showCrash(ev.error || ev.message); });
+function renderInner() {
   const d = derive();
   let body;
   if (st.view === 'coin' && st.coin) body = viewCoin(d, st.coin);
@@ -534,6 +546,7 @@ $app.addEventListener('click', async ev => {
   if (el.dataset.monthly) { st.settings.monthly = +el.dataset.monthly; S.saveSettings(st.settings); render(); return; }
   const act = el.dataset.act;
   if (act === 'refresh') { st.fine = {}; refresh({ force: true }); }
+  else if (act === 'reset-view') { st.view = 'home'; st.sheet = null; render(); }
   else if (act === 'fib') { st.fib = !st.fib; render(); }
   else if (act === 'todo') { st.sheet = 'todo'; render(); }
   else if (act === 'close') { st.sheet = null; render(); }

@@ -90,4 +90,11 @@ console.log('Moteur : tous les tests passent ✓');
   assert.equal(Math.round(r.investedNow), 50 + 501 - 99, 'versé = base + achats et frais - ventes nettes');
   assert.equal(Math.round(r.invested[0].v), 551, 'avant la vente');
 }
+{
+  // conversion EUR -> USDC dans l'historique Coinbase : ne doit ni planter ni compter comme investi
+  const D = 86400000, t0 = Date.now() - 5 * D;
+  const hist = { BTC: Array.from({ length: 5 }, (_, i) => ({ t: t0 + i * D, c: 100 })) };
+  const r = E.portfolioVsMarket({ BTC: 1 }, [{ t: t0, symbol: 'USDC', quote: 'EUR', side: 'BUY', qty: 50, eurPrice: null }], hist, t0, { BTC: 100 });
+  assert.equal(r.investedNow, 0);
+}
 console.log('Toi face au marché : tests passent ✓');

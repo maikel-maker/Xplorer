@@ -327,7 +327,8 @@ export function portfolioVsMarket(holdings, fills, history, startT, now = {}, be
   if (!bh?.length || !syms.length) return null;
   const DAY = 86400000;
   const closeAt = (sym, t) => {
-    const h = history[sym]; let best = null;
+    const h = history[sym]; if (!h?.length) return null;
+    let best = null;
     for (const p of h) { if (p.t <= t) best = p.c; else break; }
     return best ?? h[0].c;
   };
@@ -365,7 +366,8 @@ export function portfolioVsMarket(holdings, fills, history, startT, now = {}, be
     const fee = f.quote === 'EUR' ? (f.fee || 0) : 0;
     return f.side === 'BUY' ? f.qty * px + fee : -(f.qty * px - fee);
   };
-  const allFills = [...fills].sort((a, b) => a.t - b.t);
+  // seulement les vraies cryptos suivies (pas les conversions EUR <-> USDC)
+  const allFills = fills.filter(f => history[f.symbol]?.length).sort((a, b) => a.t - b.t);
   const investedAt = t => base + allFills.filter(f => f.t <= t).reduce((s, f) => s + flow(f), 0);
   const invested = points.map(t => ({ t: Math.min(t, nowT), v: investedAt(t) }));
   const last = mine.length - 1;
