@@ -406,7 +406,8 @@ export function realHistory({ txs, balancesNow, history, now = {}, usdEur = 0.92
     for (const p of h) { if (p.t <= t) best = p.c; else break; }
     return best ?? h[0].c;
   };
-  const isFlow = tx => tx.type === 'fiat_deposit' || tx.type === 'fiat_withdrawal' || (tx.type === 'send' && !['EUR', 'EURC'].includes(tx.cur));
+  // seuls les virements en euros comptent comme argent investi
+  const isFlow = tx => (tx.type === 'fiat_deposit' || tx.type === 'fiat_withdrawal') && ['EUR', 'EURC'].includes(tx.cur);
 
   const bal = {}; let invested = 0, btc = 0, ti = 0;
   const mine = [], market = [], inv = [];
@@ -471,4 +472,15 @@ export function fmtPct(v, sign = false) {
   if (v == null || isNaN(v)) return '—';
   const s = (v * 100).toLocaleString('fr-BE', { maximumFractionDigits: 1 });
   return (sign && v > 0 ? '+' : '') + s + '\u00A0%';
+}
+
+// Résumé de l'historique, pour vérifier ce que l'app a lu
+export function txSummary(txs) {
+  const m = new Map();
+  for (const t of txs || []) {
+    const k = `${t.type}|${t.cur}`;
+    const r = m.get(k) || { type: t.type, cur: t.cur, n: 0, eur: 0 };
+    r.n++; r.eur += t.eur || 0; m.set(k, r);
+  }
+  return [...m.values()].sort((a, b) => Math.abs(b.eur) - Math.abs(a.eur));
 }

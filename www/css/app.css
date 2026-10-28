@@ -273,3 +273,8 @@ input:focus, textarea:focus, select:focus { border-color: var(--cyan); }
 .stats span { font-size: 11.5px; color: var(--slate); }
 .stats b { font: 600 16px var(--display); letter-spacing: -.02em; white-space: nowrap; }
 .stats small { display: block; font-size: 11.5px; font-weight: 600; }
+
+.txs > div { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; font-size: 13.5px; }
+.txs > div + div { border-top: 1px solid var(--edge); }
+.txs small { color: var(--slate); }
+.txs b { font-family: var(--display); font-weight: 600; white-space: nowrap; }

@@ -259,10 +259,9 @@ function viewHome(d) {
     const nowPx = Object.fromEntries(Object.entries(st.prices).map(([k, v]) => [k, v.eur]));
     const usdEur = st.prices.USDC?.eur ?? 0.92;
     const perf = st.txs.length ? E.realHistory({ txs: st.txs, balancesNow: st.balances, history: st.hist, now: nowPx, usdEur, startT: cutFor(st.perfRange) }) : null;
-    if (perf && st.settings.investedBase) {
-      perf.invested = perf.invested.map(p => ({ t: p.t, v: p.v + st.settings.investedBase }));
-      perf.investedNow += st.settings.investedBase;
-    }
+    st.autoInvested = perf ? perf.investedNow : null;
+    const manual = st.settings.investedManual > 0 ? st.settings.investedManual : null;
+    if (perf && manual) perf.investedNow = manual;
     const periods = { '1M': 'Sur 1 mois', '3M': 'Sur 3 mois', '1A': 'Sur 1 an', 'Tout': 'Depuis ton premier dépôt' };
     let perfBlock = st.txError ? `<p class="note err" style="margin-top:14px">${esc(st.txError)}</p>` : (!perf ? `<p class="muted small" style="margin-top:14px">Ton historique Coinbase se charge à la prochaine actualisation.</p>` : '');
     if (perf) {
@@ -281,11 +280,11 @@ function viewHome(d) {
         ${lineChart({ height: 160, label: 'Toi face au marché', series: [
           { name: 'Toi', points: perf.mine, color: 'var(--cyan)', fill: true },
           { name: 'Tout en BTC', points: perf.market, color: 'var(--gold)', width: 1.6 },
-          { name: 'Investi', points: perf.invested, color: 'var(--slate)', width: 1.4, dash: '4 4' },
+          ...(manual ? [] : [{ name: 'Investi', points: perf.invested, color: 'var(--slate)', width: 1.4, dash: '4 4' }]),
         ] })}
-        <div class="legend"><span><i style="background:var(--cyan)"></i>Ton portefeuille</span><span><i style="background:var(--gold)"></i>Même argent en BTC</span><span><i style="background:var(--slate)"></i>Argent investi</span></div>
+        <div class="legend"><span><i style="background:var(--cyan)"></i>Ton portefeuille</span><span><i style="background:var(--gold)"></i>Même argent en BTC</span>${manual ? '' : '<span><i style="background:var(--slate)"></i>Argent investi</span>'}</div>
         <p class="verdict ${diff >= 0 ? 'up' : 'down'}">${periods[st.perfRange]}, ${tie ? 'tu fais jeu égal avec le BTC.' : `${diff >= 0 ? 'tu fais mieux que le BTC de' : 'le BTC fait mieux que toi de'} <b>${fmtEur(Math.abs(diff))}</b>.`}</p>
-        <p class="muted small">Argent investi : tes virements vers Coinbase moins tes retraits${st.settings.investedBase ? `, plus ${fmtEur(st.settings.investedBase, 0)} investis ailleurs` : ''}. La courbe or montre ce que tu aurais si chaque virement avait été mis en BTC le jour même.</p>
+        <p class="muted small">${manual ? `Argent investi : ${fmtEur(manual, 0)}, le montant que tu as indiqué dans Réglages.` : `Argent investi : tes virements en euros vers Coinbase moins tes retraits. Si ce n'est pas le bon montant, corrige-le dans Réglages.`}</p>
         ${gap ? `<p class="note err">Il manque environ ${fmtEur(Math.abs(perf.drift), 0)} dans l'historique Coinbase lu par l'app : la courbe passée peut être un peu fausse.</p>` : ''}
       </div>`;
     }
@@ -527,12 +526,17 @@ function viewSettings() {
       <form data-form="search" class="alert-form"><input name="q" placeholder="Ajouter une crypto, par ex. SOL" autocapitalize="off"><button class="btn sm">Chercher</button></form>
       ${results}
     </section>
-    <section class="card glass"><h3>Argent investi ailleurs</h3>
-      <p class="muted small">Xplorer compte tout seul tes achats Coinbase. Si tu as acheté des cryptos ailleurs ou avant, indique ici combien tu as payé au total.</p>
-      <form class="amount" data-form="base">
-        <input name="base" type="number" min="0" step="1" inputmode="decimal" value="${s.investedBase || 0}" aria-label="Argent investi ailleurs">
+    <section class="card glass"><h3>Argent investi</h3>
+      <p class="muted small">Xplorer additionne tes virements en euros vers Coinbase${st.autoInvested != null ? ` : il trouve <b>${fmtEur(st.autoInvested, 0)}</b>` : ''}. Si ce n'est pas juste, indique le vrai montant. Mets 0 pour revenir au calcul automatique.</p>
+      <form class="amount" data-form="manual">
+        <input name="manual" type="number" min="0" step="1" inputmode="decimal" value="${s.investedManual || ''}" placeholder="Ex. 700" aria-label="Argent investi">
         <span>€</span><button class="btn sm">Valider</button>
       </form>
+    </section>
+    <section class="card glass"><h3>Ce qu'Xplorer a lu chez Coinbase</h3>
+      ${st.txs.length ? `<p class="muted small">${st.txs.length} opérations. Si un chiffre te paraît faux, envoie une capture de ce tableau.</p>
+      <div class="txs">${E.txSummary(st.txs).slice(0, 25).map(r => `<div><span>${esc(r.type)} <small>${esc(r.cur)} × ${r.n}</small></span><b class="${r.eur >= 0 ? 'up' : 'down'}">${r.eur >= 0 ? '+' : '−'}${fmtEur(Math.abs(r.eur), 0)}</b></div>`).join('')}</div>`
+      : `<p class="muted small">${st.txError ? esc(st.txError) : 'Rien de lu pour l\'instant. Actualise depuis l\'accueil.'}</p>`}
     </section>
     <section class="card glass"><h3>Règle GEOD</h3>
       <form data-form="geod" class="geod">
@@ -594,6 +598,7 @@ $app.addEventListener('submit', async ev => {
     const price = parseFloat(String(data.price).replace(',', '.'));
     if (price > 0) { st.settings.alerts.push({ id: Date.now(), symbol: f.dataset.sym, dir: data.dir, price, done: false }); S.saveSettings(st.settings); askNotifications(); render(); }
   }
+  else if (kind === 'manual') { st.settings.investedManual = Math.max(0, parseFloat(String(data.manual).replace(',', '.')) || 0); S.saveSettings(st.settings); render(); }
   else if (kind === 'base') { st.settings.investedBase = Math.max(0, parseFloat(String(data.base).replace(',', '.')) || 0); S.saveSettings(st.settings); render(); }
   else if (kind === 'geod') {
     st.settings.geodBase = parseFloat(String(data.base).replace(',', '.')) || st.settings.geodBase;
