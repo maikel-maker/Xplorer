@@ -12,7 +12,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const $app = document.getElementById('app');
 
 const st = {
-  view: 'home', coin: null, range: '1M', perfRange: 'Tout', fib: false, fine: {}, sheet: null, counted: false,
+  view: 'home', coin: null, range: '1M', perfRange: '3M', fib: false, fine: {}, sheet: null, counted: false,
   settings: S.settings(),
   balances: S.load('balances'),
   fills: S.load('fills', []),
@@ -59,9 +59,8 @@ function derive() {
     ...plan.items.filter(i => i.weekEur >= 2 && !sells[i.symbol]).map(i => ({ symbol: i.symbol, action: 'buy', eur: i.weekEur, text: heads[i.symbol] })),
   ];
   const fillsEur = st.fills.map(f => ({ ...f, eurPrice: fillEurPrice(f) }));
-  const perf = E.performance(fillsEur.filter(f => st.hist[f.symbol]?.length), st.hist);
   const change24 = pf.rows.reduce((t, r) => { const c = st.prices[r.symbol]?.ch24; return c != null ? t + r.value - r.value / (1 + c) : t; }, 0);
-  return { cash, holdings, analyses, pf, sells, plan, planBy, heads, todo, perf, fillsEur, change24 };
+  return { cash, holdings, analyses, pf, sells, plan, planBy, heads, todo, fillsEur, change24 };
 }
 
 function closeAt(sym, t) {
@@ -233,20 +232,23 @@ function viewHome(d) {
       <button class="btn" data-go="settings">Ajouter ma clé Coinbase</button>
     </section>`;
   } else {
-    const ch = d.change24, perf = d.perf;
+    const ch = d.change24;
+    const nowPx = Object.fromEntries(Object.entries(st.prices).map(([k, v]) => [k, v.eur]));
+    const perf = E.portfolioVsMarket(d.holdings, d.fillsEur, st.hist, cutFor(st.perfRange), nowPx);
+    const periods = { '1M': 'Sur 1 mois', '3M': 'Sur 3 mois', '1A': 'Sur 1 an', 'Tout': 'Depuis le début de l\'historique' };
     let perfBlock = '';
-    if (perf && perf.mine.length > 2) {
-      const cut = cutFor(st.perfRange);
-      const mine = perf.mine.filter(p => p.t >= cut), market = perf.market.filter(p => p.t >= cut);
+    if (perf) {
       const diff = perf.mineNow - perf.marketNow;
+      const tie = Math.abs(diff) < Math.max(1, perf.mineNow * 0.002);
       perfBlock = `<div class="vs">
-        <div class="vs-head"><h2>Toi face au marché</h2>${seg(['3M', '1A', 'Tout'], st.perfRange, 'perf', 'sm')}</div>
+        <div class="vs-head"><h2>Toi face au marché</h2>${seg(['1M', '3M', '1A', 'Tout'], st.perfRange, 'perf', 'sm')}</div>
         ${lineChart({ height: 150, label: 'Toi face au marché', series: [
-          { name: 'Toi', points: mine, color: 'var(--cyan)', fill: true },
-          { name: 'BTC', points: market, color: 'var(--gold)', width: 1.6 },
+          { name: 'Toi', points: perf.mine, color: 'var(--cyan)', fill: true },
+          { name: 'Tout en BTC', points: perf.market, color: 'var(--gold)', width: 1.6 },
         ] })}
-        <div class="legend"><span><i style="background:var(--cyan)"></i>Toi</span><span><i style="background:var(--gold)"></i>Le même argent mis en BTC</span></div>
-        <p class="verdict ${diff >= 0 ? 'up' : 'down'}">${diff >= 0 ? 'Tu bats le marché de' : 'Le marché fait mieux que toi de'} <b>${fmtEur(Math.abs(diff))}</b> sur tes achats Coinbase.</p>
+        <div class="legend"><span><i style="background:var(--cyan)"></i>Ton portefeuille</span><span><i style="background:var(--gold)"></i>Si tout avait été en BTC</span></div>
+        <p class="verdict ${diff >= 0 ? 'up' : 'down'}">${periods[st.perfRange]}, ${tie ? 'tu fais jeu égal avec le BTC.' : `${diff >= 0 ? 'tu fais mieux que le BTC de' : 'le BTC fait mieux que toi de'} <b>${fmtEur(Math.abs(diff))}</b>.`}</p>
+        <p class="muted small">Ta courbe part de ce que tu avais en début de période. Les cryptos reçues sans achat (récompenses, transferts) comptent comme un gain.</p>
       </div>`;
     }
     hero = `<section class="hero glass">

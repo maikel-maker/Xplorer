@@ -62,3 +62,21 @@ assert.equal(Math.round(perf.mineNow), Math.round(perf.marketNow));
 assert.equal(perf.investedNow, 100);
 
 console.log('Moteur : tous les tests passent ✓');
+
+// 10. toi face au marché (portefeuille réel) : finit au vrai total, BTC seul = marché
+{
+  const D = 86400000, t0 = Date.now() - 10 * D;
+  const hist = { BTC: Array.from({ length: 10 }, (_, i) => ({ t: t0 + i * D, c: 100 + i * 10 })),
+                 GEOD: Array.from({ length: 10 }, (_, i) => ({ t: t0 + i * D, c: 1 })) };
+  const r1 = E.portfolioVsMarket({ BTC: 2 }, [], hist, t0, { BTC: 200 });
+  assert.equal(Math.round(r1.mineNow), 400, 'finit au vrai total');
+  assert.equal(Math.round(r1.marketNow), 400, 'que du BTC = marché');
+  // achat de BTC au jour 5 : avant, on en avait 1 de moins
+  const r2 = E.portfolioVsMarket({ BTC: 2 }, [{ t: t0 + 5 * D + 1000, symbol: 'BTC', side: 'BUY', qty: 1, eurPrice: 150 }], hist, t0, { BTC: 200 });
+  assert.equal(Math.round(r2.mine[0].v), 100, 'départ = 1 seul BTC avant l\'achat');
+  assert.equal(Math.round(r2.mineNow), Math.round(r2.marketNow), 'mêmes achats en BTC = marché');
+  // GEOD stable pendant que le BTC monte : le marché fait mieux
+  const r3 = E.portfolioVsMarket({ GEOD: 100 }, [], hist, t0, { BTC: 200, GEOD: 1 });
+  assert.ok(r3.marketNow > r3.mineNow);
+}
+console.log('Toi face au marché : tests passent ✓');

@@ -316,6 +316,53 @@ export function performance(fills, history, bench = 'BTC') {
   };
 }
 
+// Toi face au marché, à partir de ce que tu possèdes vraiment.
+// On remonte le temps : quantité d'hier = quantité d'aujourd'hui moins les achats faits depuis (plus les ventes).
+// Le "marché" part de la même valeur que toi au début de la période, tout en BTC,
+// et suit les mêmes achats et ventes en euros.
+// holdings : {SYM: qty}, fills : [{t, symbol, side, qty, eurPrice}], history : {SYM: [{t, c}]}, now : {SYM: prix actuel}
+export function portfolioVsMarket(holdings, fills, history, startT, now = {}, bench = 'BTC') {
+  const bh = history[bench];
+  const syms = Object.keys(holdings).filter(s => holdings[s] > 0 && history[s]?.length);
+  if (!bh?.length || !syms.length) return null;
+  const DAY = 86400000;
+  const closeAt = (sym, t) => {
+    const h = history[sym]; let best = null;
+    for (const p of h) { if (p.t <= t) best = p.c; else break; }
+    return best ?? h[0].c;
+  };
+  const relevant = fills.filter(f => syms.includes(f.symbol) || f.symbol === bench).sort((a, b) => a.t - b.t);
+  const qtyAt = (sym, t) => {
+    let q = holdings[sym] || 0;
+    for (const f of relevant) if (f.symbol === sym && f.t > t) q -= f.side === 'BUY' ? f.qty : -f.qty;
+    return Math.max(0, q);
+  };
+  const days = bh.filter(p => p.t >= startT).map(p => p.t + DAY - 1); // fin de journée
+  const nowT = Date.now();
+  const points = [...days, nowT];
+  const valueAt = t => syms.reduce((v, s) => {
+    const px = t === nowT && now[s] ? now[s] : closeAt(s, t);
+    return v + qtyAt(s, t) * (px || 0);
+  }, 0);
+  const mine = points.map(t => ({ t: Math.min(t, nowT), v: valueAt(t) }));
+  if (mine.length < 2 || !(mine[0].v > 0)) return null;
+
+  const btcPx = t => (t === nowT && now[bench] ? now[bench] : closeAt(bench, t));
+  let btc = mine[0].v / btcPx(points[0]);
+  let fi = relevant.findIndex(f => f.t > points[0]);
+  if (fi < 0) fi = relevant.length;
+  const market = points.map(t => {
+    while (fi < relevant.length && relevant[fi].t <= t) {
+      const f = relevant[fi++];
+      const eur = f.qty * (f.eurPrice || closeAt(f.symbol, f.t)) * (f.side === 'BUY' ? 1 : -1);
+      btc = Math.max(0, btc + eur / closeAt(bench, f.t));
+    }
+    return { t: Math.min(t, nowT), v: btc * btcPx(t) };
+  });
+  const last = mine.length - 1;
+  return { mine, market, mineNow: mine[last].v, marketNow: market[last].v, start: mine[0].v };
+}
+
 // ---------- formats ----------
 
 export function priceDecimals(p) {
