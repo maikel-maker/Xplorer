@@ -378,6 +378,77 @@ export function portfolioVsMarket(holdings, fills, history, startT, now = {}, be
   };
 }
 
+// Ton vrai historique, reconstruit à partir de toutes tes transactions Coinbase.
+// txs : [{ t, type, cur, amount, eur }] ; balancesNow : soldes actuels { CUR: qty } (cryptos + EUR/USDC)
+// history : { SYM: [{t, c}] } en euros ; now : { SYM: prix actuel } ; usdEur : valeur d'1 USD/USDC en euros
+// Argent investi = virements reçus - retraits + cryptos envoyées vers Coinbase - cryptos sorties.
+export const MONEY_IN = ['fiat_deposit', 'fiat_withdrawal', 'send'];
+const STABLES = ['USDC', 'USD', 'USDT'];
+
+export function realHistory({ txs, balancesNow, history, now = {}, usdEur = 0.92, startT = 0, bench = 'BTC' }) {
+  const bh = history[bench];
+  if (!txs?.length || !bh?.length) return null;
+  const DAY = 86400000;
+  const nowT = Date.now();
+  const first = txs[0].t;
+  const from = Math.max(startT, first - DAY);
+  const days = bh.filter(p => p.t + DAY - 1 >= from).map(p => p.t + DAY - 1);
+  const points = [...days.filter(t => t < nowT), nowT];
+  if (points.length < 2) return null;
+
+  const px = (cur, t) => {
+    if (cur === 'EUR' || cur === 'EURC') return 1;
+    if (STABLES.includes(cur)) return usdEur;
+    const h = history[cur];
+    if (t === nowT && now[cur]) return now[cur];
+    if (!h?.length) return now[cur] ?? 0;
+    let best = null;
+    for (const p of h) { if (p.t <= t) best = p.c; else break; }
+    return best ?? h[0].c;
+  };
+  const isFlow = tx => tx.type === 'fiat_deposit' || tx.type === 'fiat_withdrawal' || (tx.type === 'send' && !['EUR', 'EURC'].includes(tx.cur));
+
+  const bal = {}; let invested = 0, btc = 0, ti = 0;
+  const mine = [], market = [], inv = [];
+  let started = false;
+  for (const t of points) {
+    while (ti < txs.length && txs[ti].t <= t) {
+      const tx = txs[ti++];
+      bal[tx.cur] = (bal[tx.cur] || 0) + tx.amount;
+      if (isFlow(tx)) {
+        const eur = tx.eur || tx.amount * px(tx.cur, tx.t);
+        invested += eur;
+        if (started) btc = Math.max(0, btc + eur / px(bench, tx.t));
+      }
+    }
+    const isNow = t === nowT;
+    const src = isNow && balancesNow ? balancesNow : bal;
+    let v = 0;
+    for (const [cur, q] of Object.entries(src)) if (q > 0) v += q * px(cur, t);
+    if (!started) {
+      // le BTC part de la même valeur que toi au début de la période
+      btc = v / px(bench, t);
+      started = true;
+    }
+    mine.push({ t, v });
+    inv.push({ t, v: invested });
+    market.push({ t, v: btc * px(bench, t) });
+  }
+  // écart entre l'historique reconstruit et les vrais soldes (transactions manquantes)
+  let drift = 0;
+  if (balancesNow) {
+    for (const cur of new Set([...Object.keys(bal), ...Object.keys(balancesNow)])) {
+      drift += ((balancesNow[cur] || 0) - (bal[cur] || 0)) * px(cur, nowT);
+    }
+  }
+  const L = points.length - 1;
+  return {
+    mine, market, invested: inv,
+    mineNow: mine[L].v, marketNow: market[L].v, investedNow: inv[L].v,
+    start: mine[0].v, investedInPeriod: inv[L].v - inv[0].v, drift,
+  };
+}
+
 // ---------- formats ----------
 
 export function priceDecimals(p) {

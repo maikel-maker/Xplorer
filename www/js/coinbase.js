@@ -127,3 +127,51 @@ export async function fetchFills(creds) {
   }
   return out.sort((a, b) => a.t - b.t);
 }
+
+// ---------- historique complet (API Coinbase App v2) ----------
+
+async function getV2(creds, pathWithQuery) {
+  const path = pathWithQuery.split('?')[0];
+  const jwt = await buildJwt(creds.name, creds.pem, 'GET', path);
+  const res = await fetch(`https://${HOST}${pathWithQuery}`, { headers: { Authorization: `Bearer ${jwt}`, 'CB-VERSION': '2024-01-01' } });
+  if (res.status === 401) throw new Error('Coinbase refuse la lecture de l\'historique (401).');
+  if (!res.ok) throw new Error(`Historique Coinbase : réponse ${res.status}.`);
+  return res.json();
+}
+const code = c => (typeof c === 'string' ? c : c?.code) || '';
+
+// Toutes les transactions des comptes utiles : [{ t, type, cur, amount, eur }]
+// amount : quantité signée de la monnaie du compte ; eur : contre-valeur signée au moment de l'opération
+export async function fetchTransactions(creds, wanted = new Set(), onProgress) {
+  const accounts = [];
+  let next = '/v2/accounts?limit=100';
+  for (let page = 0; next && page < 40; page++) {
+    const j = await getV2(creds, next);
+    accounts.push(...(j.data || []));
+    next = j.pagination?.next_uri || null;
+  }
+  const keep = accounts.filter(a => {
+    const c = code(a.currency);
+    return parseFloat(a.balance?.amount || 0) !== 0 || wanted.has(c) || c === 'EUR';
+  });
+  const out = [];
+  for (const a of keep) {
+    const c = code(a.currency);
+    onProgress?.(c);
+    let nx = `/v2/accounts/${a.id}/transactions?limit=100`;
+    for (let page = 0; nx && page < 30; page++) {
+      const j = await getV2(creds, nx);
+      for (const tx of j.data || []) {
+        if (tx.status && tx.status !== 'completed') continue;
+        const amount = parseFloat(tx.amount?.amount);
+        if (!isFinite(amount) || amount === 0) continue;
+        out.push({
+          t: Date.parse(tx.created_at), type: tx.type, cur: code(tx.amount?.currency) || c, amount,
+          eur: parseFloat(tx.native_amount?.amount || 0), native: tx.native_amount?.currency || 'EUR',
+        });
+      }
+      nx = j.pagination?.next_uri || null;
+    }
+  }
+  return out.sort((a, b) => a.t - b.t);
+}

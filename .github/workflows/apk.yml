@@ -28,7 +28,7 @@ jobs:
           java-version: 21
 
       - name: Tests du moteur
-        run: node test/engine.test.mjs && node test/ta.test.mjs
+        run: node test/engine.test.mjs && node test/ta.test.mjs && node test/history.test.mjs
 
       - name: Dépendances
         run: npm install --no-audit --no-fund

@@ -7,8 +7,12 @@ const DAY = 86400000;
 const today = () => new Date().toISOString().slice(0, 10);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function json(url) {
+let usdEur = 0.92;
+export function setUsdEur(v) { if (v > 0) usdEur = v; }
+
+async function json(url, retry = true) {
   const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (res.status === 429 && retry && url.startsWith(CG)) { await sleep(20000); return json(url, false); }
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
@@ -27,10 +31,12 @@ export async function history(asset, { force = false } = {}) {
       data = dedupeDays(pts.filter(p => p.t < startToday));
     } catch { data = null; }
   }
-  if (!data?.length) {
+  // secours : bougies Coinbase en EUR, sinon en USD converties
+  for (const [q, k] of [['EUR', 1], ['USD', usdEur], ['USDC', usdEur]]) {
+    if (data?.length) break;
     try {
-      const rows = await json(`${CBX}/products/${asset.symbol}-EUR/candles?granularity=86400`);
-      data = rows.map(r => ({ t: r[0] * 1000, c: r[4] })).reverse().slice(0, -1);
+      const rows = await json(`${CBX}/products/${asset.symbol}-${q}/candles?granularity=86400`);
+      data = rows.map(r => ({ t: r[0] * 1000, c: r[4] * k })).reverse().slice(0, -1);
     } catch { data = null; }
   }
   if (data?.length) { save(key, { day: today(), data }); return data; }
@@ -54,15 +60,18 @@ export async function prices(assets) {
       const p = j[a.cg];
       if (p?.eur > 0) out[a.symbol] = { eur: p.eur, ch24: p.eur_24h_change != null ? p.eur_24h_change / 100 : null };
     }
-    if (j['usd-coin']?.eur) out.USDC = { eur: j['usd-coin'].eur };
+    if (j['usd-coin']?.eur) { out.USDC = { eur: j['usd-coin'].eur }; setUsdEur(j['usd-coin'].eur); }
   } catch { /* secours ci-dessous */ }
   for (const a of assets) {
     if (out[a.symbol]) continue;
-    try {
-      const t = await json(`${CBX}/products/${a.symbol}-EUR/ticker`);
-      const p = parseFloat(t.price);
-      if (p > 0) out[a.symbol] = { eur: p, ch24: null };
-    } catch { /* pas de prix = pas d'avis */ }
+    for (const [q, k] of [['EUR', 1], ['USD', usdEur], ['USDC', usdEur]]) {
+      if (out[a.symbol]) break;
+      try {
+        const t = await json(`${CBX}/products/${a.symbol}-${q}/ticker`);
+        const p = parseFloat(t.price) * k;
+        if (p > 0) out[a.symbol] = { eur: p, ch24: null };
+      } catch { /* pas de prix = pas d'avis */ }
+    }
   }
   return out;
 }
@@ -75,7 +84,7 @@ export async function histories(assets, onProgress) {
     const fresh = cached?.day === today();
     out[a.symbol] = await history(a);
     onProgress?.(a.symbol);
-    if (!fresh) await sleep(1300);
+    if (!fresh) await sleep(2500);
   }
   return out;
 }

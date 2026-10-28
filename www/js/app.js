@@ -16,6 +16,7 @@ const st = {
   settings: S.settings(),
   balances: S.load('balances'),
   fills: S.load('fills', []),
+  txs: S.load('txs', []), txError: null,
   prices: S.load('prices', {}),
   hist: {},
   lastUpdate: S.load('lastUpdate'),
@@ -58,7 +59,11 @@ function derive() {
     ...Object.entries(sells).map(([sym, sa]) => ({ symbol: sym, action: 'sell', eur: sa.eur, text: heads[sym] })),
     ...plan.items.filter(i => i.weekEur >= 2 && !sells[i.symbol]).map(i => ({ symbol: i.symbol, action: 'buy', eur: i.weekEur, text: heads[i.symbol] })),
   ];
-  const fillsEur = st.fills.map(f => ({ ...f, eurPrice: fillEurPrice(f) }));
+  const TRADE = ['buy', 'sell', 'advanced_trade_fill', 'trade'];
+  const fillsEur = st.txs.length
+    ? st.txs.filter(x => TRADE.includes(x.type) && !S.CASH.includes(x.cur) && x.eur)
+        .map(x => ({ t: x.t, symbol: x.cur, side: x.amount > 0 ? 'BUY' : 'SELL', qty: Math.abs(x.amount), eurPrice: Math.abs(x.eur / x.amount) }))
+    : st.fills.map(f => ({ ...f, eurPrice: fillEurPrice(f) }));
   const change24 = pf.rows.reduce((t, r) => { const c = st.prices[r.symbol]?.ch24; return c != null ? t + r.value - r.value / (1 + c) : t; }, 0);
   return { cash, holdings, analyses, pf, sells, plan, planBy, heads, todo, fillsEur, change24 };
 }
@@ -87,6 +92,12 @@ async function refresh({ force = false } = {}) {
         st.balances = await CB.fetchBalances(creds);
         st.fills = await CB.fetchFills(creds);
         S.save('balances', st.balances); S.save('fills', st.fills);
+        try {
+          const wanted = new Set([...st.settings.assets.map(a => a.symbol), ...st.fills.map(f => f.symbol), 'USDC', 'EUR']);
+          st.progress = 'Historique Coinbase…'; render();
+          st.txs = await CB.fetchTransactions(creds, wanted, c => { st.progress = `Historique ${c}…`; });
+          S.save('txs', st.txs); st.txError = null;
+        } catch (e) { st.txError = e.message; }
         st.cbError = null;
         await addHeldCoins();
       } catch (e) { st.cbError = e.message; }
@@ -246,16 +257,20 @@ function viewHome(d) {
   } else {
     const ch = d.change24;
     const nowPx = Object.fromEntries(Object.entries(st.prices).map(([k, v]) => [k, v.eur]));
-    const perf = E.portfolioVsMarket(d.holdings, d.fillsEur, st.hist, cutFor(st.perfRange), nowPx, 'BTC', st.settings.investedBase || 0);
-    const periods = { '1M': 'Sur 1 mois', '3M': 'Sur 3 mois', '1A': 'Sur 1 an', 'Tout': 'Sur tout l\'historique' };
-    let perfBlock = '';
+    const usdEur = st.prices.USDC?.eur ?? 0.92;
+    const perf = st.txs.length ? E.realHistory({ txs: st.txs, balancesNow: st.balances, history: st.hist, now: nowPx, usdEur, startT: cutFor(st.perfRange) }) : null;
+    if (perf && st.settings.investedBase) {
+      perf.invested = perf.invested.map(p => ({ t: p.t, v: p.v + st.settings.investedBase }));
+      perf.investedNow += st.settings.investedBase;
+    }
+    const periods = { '1M': 'Sur 1 mois', '3M': 'Sur 3 mois', '1A': 'Sur 1 an', 'Tout': 'Depuis ton premier dépôt' };
+    let perfBlock = st.txError ? `<p class="note err" style="margin-top:14px">${esc(st.txError)}</p>` : (!perf ? `<p class="muted small" style="margin-top:14px">Ton historique Coinbase se charge à la prochaine actualisation.</p>` : '');
     if (perf) {
       const gain = perf.mineNow - perf.investedNow;
       const gainPct = perf.investedNow > 0 ? gain / perf.investedNow : null;
-      const btcGain = perf.marketNow - perf.mine[0].v - perf.investedInPeriod;
-      const myGain = perf.mineNow - perf.mine[0].v - perf.investedInPeriod;
-      const diff = myGain - btcGain;
+      const diff = perf.mineNow - perf.marketNow;
       const tie = Math.abs(diff) < Math.max(1, perf.mineNow * 0.002);
+      const gap = Math.abs(perf.drift) > Math.max(5, perf.mineNow * 0.02);
       perfBlock = `<div class="stats">
           <div><span>Argent investi</span><b>${fmtEur(perf.investedNow, 0)}</b></div>
           <div><span>Valeur aujourd'hui</span><b>${fmtEur(perf.mineNow, 0)}</b></div>
@@ -270,7 +285,8 @@ function viewHome(d) {
         ] })}
         <div class="legend"><span><i style="background:var(--cyan)"></i>Ton portefeuille</span><span><i style="background:var(--gold)"></i>Même argent en BTC</span><span><i style="background:var(--slate)"></i>Argent investi</span></div>
         <p class="verdict ${diff >= 0 ? 'up' : 'down'}">${periods[st.perfRange]}, ${tie ? 'tu fais jeu égal avec le BTC.' : `${diff >= 0 ? 'tu fais mieux que le BTC de' : 'le BTC fait mieux que toi de'} <b>${fmtEur(Math.abs(diff))}</b>.`}</p>
-        <p class="muted small">L'argent investi, c'est tous tes achats Coinbase (frais compris) moins tes ventes${st.settings.investedBase ? `, plus ${fmtEur(st.settings.investedBase, 0)} investis ailleurs` : ''}. Si tu avais des cryptos d'ailleurs, ajoute ce que tu as payé dans Réglages.</p>
+        <p class="muted small">Argent investi : tes virements vers Coinbase moins tes retraits${st.settings.investedBase ? `, plus ${fmtEur(st.settings.investedBase, 0)} investis ailleurs` : ''}. La courbe or montre ce que tu aurais si chaque virement avait été mis en BTC le jour même.</p>
+        ${gap ? `<p class="note err">Il manque environ ${fmtEur(Math.abs(perf.drift), 0)} dans l'historique Coinbase lu par l'app : la courbe passée peut être un peu fausse.</p>` : ''}
       </div>`;
     }
     hero = `<section class="hero glass">
