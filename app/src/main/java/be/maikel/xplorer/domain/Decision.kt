@@ -368,7 +368,8 @@ object Planner {
             val small = alloc.filter { it.value in 0.0..MIN_ORDER && it.value > 0 }
             val freed = small.values.sum()
             small.keys.forEach { alloc[it] = 0.0; notes[it] = "Montant trop petit pour justifier les frais." }
-            alloc.maxByOrNull { it.value }?.let { if (it.value > 0) alloc[it.key] = it.value + freed }
+            val biggest = alloc.maxByOrNull { it.value }
+            if (biggest != null && biggest.value > 0) alloc[biggest.key] = biggest.value + freed
         }
         val lines = targets.keys.map { s ->
             val eur = Math.round(alloc[s] ?: 0.0).toDouble()

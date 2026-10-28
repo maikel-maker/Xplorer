@@ -56,6 +56,18 @@ jobs:
           set -o pipefail
           gradle :app:testReleaseUnitTest --no-daemon --console=plain 2>&1 | tee -a build.log
 
+      - name: Bilan des tests
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          t=f=e=s=0
+          for x in glob.glob('app/build/test-results/testReleaseUnitTest/*.xml'):
+              r=ET.parse(x).getroot(); t+=int(r.get('tests')); f+=int(r.get('failures')); e+=int(r.get('errors')); s+=int(r.get('skipped'))
+              print(r.get('name'), r.get('tests'), 'tests')
+          print(f"::notice::Tests unitaires : {t} exécutés, {f} échecs, {e} erreurs, {s} ignorés")
+          assert t > 0 and f == 0 and e == 0
+          PY
+
       - name: Signature
         env:
           KS_B64: ${{ secrets.XP_KEYSTORE_B64 }}
