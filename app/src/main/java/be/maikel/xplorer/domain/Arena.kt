@@ -194,7 +194,9 @@ object Arena {
             syms.associateWith { (targets[it] ?: 0.0) / t }
         }
         val tilted = base.mapValues { (s, b) -> b * (debates[s]?.multiplier ?: 1.0) }
-        var weights = normalize(tilted)
+        // Bulls / Bears ne fait jamais dépasser une cible : chaque crypto reçoit au plus ce qui lui manque.
+        val tSum = syms.sumOf { targets[it] ?: 0.0 }
+        var weights = capToNeed(normalize(tilted), need, budget, syms.associateWith { (targets[it] ?: 0.0) / tSum })
 
         // Pas de miettes : un ordre trop petit coûte trop en frais, sa part va aux autres.
         repeat(syms.size) {
@@ -219,6 +221,38 @@ object Arena {
         val headline = if (top == null) "Rien à acheter cette semaine." else
             "Cette semaine : ${Money.eur(budget, 0)} à investir, surtout en ${top.symbol} (${Money.eur(top.eur, 0)})."
         return Plan(budget, lines, headline)
+    }
+
+    /**
+     * Répartit [budget] selon [w] sans donner à une crypto plus que [need] (ce qui lui manque pour sa cible).
+     * Le surplus va aux autres cryptos qui ont encore de la place ; s'il reste de l'argent quand toutes
+     * sont à leur cible, il est réparti selon les cibles [fallback].
+     */
+    fun capToNeed(w: Map<String, Double>, need: Map<String, Double>, budget: Double, fallback: Map<String, Double>): Map<String, Double> {
+        if (budget <= 0) return w
+        val eur = w.mapValues { 0.0 }.toMutableMap()
+        var left = budget
+        var open = w.filter { it.value > 0 && (need[it.key] ?: 0.0) > 0 }.keys.toMutableSet()
+        repeat(w.size + 1) {
+            if (left <= 1e-9 || open.isEmpty()) return@repeat
+            val tot = open.sumOf { w[it] ?: 0.0 }
+            if (tot <= 0) return@repeat
+            val full = HashSet<String>()
+            var spent = 0.0
+            for (k in open) {
+                val room = (need[k] ?: 0.0) - (eur[k] ?: 0.0)
+                val give = min(left * (w[k] ?: 0.0) / tot, room)
+                eur[k] = (eur[k] ?: 0.0) + give; spent += give
+                if (give >= room - 1e-9) full += k
+            }
+            left -= spent
+            open = (open - full).toMutableSet()
+        }
+        if (left > 1e-9) {
+            val f = normalize(fallback.filterKeys { it in w.keys })
+            for ((k, v) in f) eur[k] = (eur[k] ?: 0.0) + left * v
+        }
+        return normalize(eur)
     }
 
     private fun normalize(w: Map<String, Double>): Map<String, Double> {

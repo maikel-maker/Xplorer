@@ -63,23 +63,19 @@ object Pipeline {
                 messages += Triple("risque", "${p.symbol} — exposition au-dessus de ta limite", "${Money.pct(p.weight)} de tes cryptos pour une limite de ${Money.pct(st.maxFor(p.symbol))}.")
         }
 
-        // 5. DCA intelligent : la réserve « creux » évolue une fois par semaine (budget des réglages uniquement).
-        a.dca?.takeIf { a.dcaDefaultBudget }?.let { plan ->
+        // 5. Le plan de la semaine : une notification chaque lundi (après les heures silencieuses), une seule fois.
+        a.arenaPlan?.takeIf { a.dcaDefaultBudget && it.total > 0 }?.let { plan ->
             val cur = repo.prefs.load()
             val week = a.dcaWeek
-            var next = cur
-            if (cur.dcaWeek != week) {
-                val reserve = reserveFor(cur, week)
-                val since = when {
-                    reserve <= 0.5 -> null
-                    cur.dcaReserveSince == null -> now
-                    else -> cur.dcaReserveSince
-                }
-                next = next.copy(dcaWeek = week, dcaReserveStart = reserve, dcaReserveSince = since)
-                if (cur.dcaWeek != null) messages += Triple("dca", "Plan DCA de la semaine", plan.headline)
+            val h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+            val quietNow = if (cur.quietStart > cur.quietEnd) h >= cur.quietStart || h < cur.quietEnd else h in cur.quietStart until cur.quietEnd
+            if (cur.dcaWeek != week && !quietNow) {
+                val held = a.ledger.positions.associate { it.symbol to it.value }
+                val body = plan.lines.filter { it.eur > 0 }.sortedByDescending { held[it.symbol] ?: 0.0 }
+                    .joinToString(" · ") { "${it.symbol} ${Money.eur(it.eur, 0)}" }
+                if (cur.dcaWeek != null) messages += Triple("dca", "Ton DCA de la semaine : ${Money.eur(plan.total, 0)}", body)
+                repo.prefs.save(cur.copy(dcaWeek = week, dcaReserveStart = 0.0, dcaReserveSince = null, dcaPendingDelta = 0.0))
             }
-            if (abs(next.dcaPendingDelta - plan.reserveDelta) > 0.5 || next !== cur) next = next.copy(dcaPendingDelta = plan.reserveDelta)
-            if (next != cur) repo.prefs.save(next)
         }
 
         if (!notify || !st.notifications) return

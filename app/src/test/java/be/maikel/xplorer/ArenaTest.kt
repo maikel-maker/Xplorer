@@ -99,4 +99,16 @@ class ArenaTest {
     @Test fun backtestNeedsEnoughHistory() {
         assertEquals(null, Arena.backtest(mapOf("BTC" to series(100) { 1.0 }), targets, 225.0))
     }
+
+    @Test fun bullsNeverPushAboveTarget() {
+        // ETH en retard de 20 €, BTC de 200 € : même avec un ETH très Bulls, ETH ne reçoit pas plus de 20 €.
+        val w = Arena.capToNeed(mapOf("BTC" to 0.2, "ETH" to 0.8), mapOf("BTC" to 200.0, "ETH" to 20.0), 100.0, mapOf("BTC" to 0.5, "ETH" to 0.5))
+        assertEquals(20.0, w["ETH"]!! * 100, 1e-6)
+        assertEquals(80.0, w["BTC"]!! * 100, 1e-6)
+    }
+
+    @Test fun leftoverFollowsTargetsWhenEverythingIsOnTarget() {
+        val w = Arena.capToNeed(mapOf("BTC" to 0.5, "ETH" to 0.5), mapOf("BTC" to 0.0, "ETH" to 0.0), 100.0, mapOf("BTC" to 0.8, "ETH" to 0.2))
+        assertEquals(0.8, w["BTC"]!!, 1e-9)
+    }
 }
