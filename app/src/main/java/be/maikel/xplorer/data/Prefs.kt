@@ -8,7 +8,7 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 data class Settings(
-    val targets: Map<String, Double> = mapOf("BTC" to 0.55, "GEOD" to 0.20, "ETH" to 0.17, "LINK" to 0.05, "TAO" to 0.03),
+    val targets: Map<String, Double> = mapOf("BTC" to 0.50, "ETH" to 0.20, "GEOD" to 0.20, "LINK" to 0.05, "TAO" to 0.05),
     val watchlist: List<String> = listOf("SOL", "AKT", "NEAR"),
     val maxWeightDefault: Double = 0.5,
     val maxWeight: Map<String, Double> = emptyMap(),
@@ -52,7 +52,7 @@ class Prefs(context: Context) {
 
     /**
      * v2 (30/10/2026) : 225 € par semaine, répartis par l'arène, plus de réserve « creux ».
-     * v3 (30/10/2026) : KRL retiré ; cibles calées sur la répartition réelle de Maïkel (BTC 55 · GEOD 20 · ETH 17 · LINK 5 · TAO 3).
+     * v4 (30/10/2026) : KRL retiré ; cibles en chiffres ronds choisies par Maïkel (BTC 50 · ETH 20 · GEOD 20 · LINK 5 · TAO 5).
      */
     private fun migrate(s: Settings): Settings {
         var m = s
@@ -60,10 +60,10 @@ class Prefs(context: Context) {
             monthlyBudget = 975.0, weeklyBudget = 225.0, dcaSchema = 2,
             dcaReserveStart = 0.0, dcaReserveSince = null, dcaPendingDelta = 0.0,
         )
-        if (m.dcaSchema < 3) m = m.copy(
+        if (m.dcaSchema < 4) m = m.copy(
             targets = Settings().targets,
             watchlist = m.watchlist - "KRL",
-            dcaSchema = 3,
+            dcaSchema = 4,
         )
         if (m != s) save(m)
         return m
