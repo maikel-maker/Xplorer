@@ -15,6 +15,8 @@ import be.maikel.xplorer.domain.Recommendation
 import be.maikel.xplorer.domain.Rules
 import be.maikel.xplorer.domain.Signal
 import be.maikel.xplorer.domain.SmartDca
+import be.maikel.xplorer.domain.SwingAlgo
+import be.maikel.xplorer.domain.Achievements
 import be.maikel.xplorer.domain.PlanLine
 import be.maikel.xplorer.domain.Action
 import be.maikel.xplorer.domain.WeeklyPlan
@@ -57,6 +59,9 @@ data class Analysis(
     val dcaWeek: Long = 0,
     val dcaDefaultBudget: Boolean = true,
     val dcaCashWarning: String? = null,
+    val achievements: Achievements.Summary? = null,
+    /** Algorithme « marché mixte » simulé sur l'historique de chaque crypto. */
+    val swing: Map<String, SwingAlgo.Result> = emptyMap(),
 )
 
 /** Semaines commençant le lundi (le 1er janvier 1970 était un jeudi). */
@@ -71,7 +76,7 @@ fun reserveFor(st: be.maikel.xplorer.data.Settings, week: Long): Double = when (
 
 object Analyzer {
 
-    fun run(s: Snapshot, h4: Map<String, List<Candle>>, budget: Double? = null, now: Long = System.currentTimeMillis()): Analysis {
+    fun run(s: Snapshot, h4: Map<String, List<Candle>>, budget: Double? = null, now: Long = System.currentTimeMillis(), declaredWeeks: Int = 0): Analysis {
         val st = s.settings
         val ledger = Ledger.compute(s.ops, s.balances, s.prices, s.usdEurNow)
         val dailyClose = s.daily.mapValues { (_, c) -> c.associate { History.dayOf(it.t) to it.close } }
@@ -117,6 +122,19 @@ object Analyzer {
             dca.lines.map { l -> PlanLine(l.symbol, l.eur, l.note, if (l.eur > 0) Action.ACHETER else Action.ATTENDRE) },
             dca.toReserve, dca.headline, cashWarning,
         )
+        val swing = st.targets.keys.mapNotNull { sym -> s.daily[sym]?.let { d -> SwingAlgo.simulate(sym, d, st.weeklyBudget, noSell = sym == "GEOD")?.let { sym to it } } }.toMap()
+        // Achats « malins » : faits quand le prix était sous sa moyenne 200 jours ce jour-là.
+        val smartBuys = ledger.trades.count { tr ->
+            if (!tr.buy) return@count false
+            val d = s.daily[tr.symbol] ?: return@count false
+            val i = d.indexOfLast { it.t <= tr.t }
+            i >= 199 && tr.unitEur > 0 && tr.unitEur < d.subList(i - 199, i + 1).sumOf { it.close } / 200
+        }
+        val beats = history?.points?.lastOrNull()?.let { p -> if (p.benchmark.isNaN()) null else p.value > p.benchmark }
+        val achievements = Achievements.compute(
+            ledger.trades.filter { st.startDate == null || it.t >= st.startDate }, declaredWeeks, capital,
+            history?.maxDrawdown, beats, weights, st.targets, smartBuys, now,
+        )
         val backtests = st.targets.keys.mapNotNull { sym -> s.daily[sym]?.let { SmartDca.backtest(sym, it, weekly = st.weeklyBudget) } }
         val signals = universe.flatMap { sym ->
             Radar.scan(sym, s.daily[sym] ?: emptyList(), s.prices[sym] ?: Double.NaN, weights[sym] ?: 0.0, st.maxFor(sym), s.volume24Eur[sym])
@@ -133,7 +151,7 @@ object Analyzer {
         if (ledger.externalNetEur != 0.0) issues += "Transferts de cryptos depuis ou vers l'extérieur : ${Money.signedEur(ledger.externalNetEur, 0)} (valeur à la date du transfert), exclus des gains."
 
         return Analysis(s, ledger, history, recs, plan, signals, health(s, ledger, history), capital, capitalManual, gain, gainPct, dayChange to dayPct, issues, sinceStart, history?.startValue, lifetimeGain,
-            dca, mayer, backtests, week, budget == null, cashWarning)
+            dca, mayer, backtests, week, budget == null, cashWarning, achievements, swing)
     }
 
     private fun health(s: Snapshot, l: LedgerResult, h: PortfolioHistory?): Health {

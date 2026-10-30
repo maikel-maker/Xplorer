@@ -68,9 +68,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun recompute() {
         val snap = repo.snapshot()
-        val a = withContext(Dispatchers.Default) { Analyzer.run(snap, repo.h4, _state.value.budget) }
         val dao = repo.dao
         val j = dao.journal(); val al = dao.alerts(); val inn = dao.intents(); val co = dao.corrections()
+        val doneWeeks = inn.map { Math.floorDiv(it.t / 86_400_000L + 3, 7L) }.toSet().size
+        val a = withContext(Dispatchers.Default) { Analyzer.run(snap, repo.h4, _state.value.budget, declaredWeeks = doneWeeks) }
         _state.update { it.copy(analysis = a, journal = j, alerts = al, intents = inn, corrections = co, hasKey = repo.hasKey()) }
     }
 

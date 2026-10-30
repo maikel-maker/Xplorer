@@ -44,12 +44,15 @@ import kotlin.math.roundToInt
 
 data class Series(val name: String, val points: List<Pair<Long, Double>>, val color: Color, val fill: Boolean = false, val dashed: Boolean = false, val width: Float = 2f)
 
+/** Point d'achat (vert, pointe vers le haut, sous la courbe) ou de vente (rouge, au-dessus). */
+data class Mark(val t: Long, val price: Double, val buy: Boolean)
+
 private val dayFmt = SimpleDateFormat("d MMM yy", Locale.FRANCE)
 private val timeFmt = SimpleDateFormat("d MMM HH:mm", Locale.FRANCE)
 
 /** Courbes simples (valeur du portefeuille, BTC, capital) avec lecture au doigt. */
 @Composable
-fun LineChart(series: List<Series>, modifier: Modifier = Modifier, height: Int = 170) {
+fun LineChart(series: List<Series>, modifier: Modifier = Modifier, height: Int = 170, marks: List<Mark> = emptyList()) {
     val tm = rememberTextMeasurer()
     var touch by remember { mutableStateOf<Float?>(null) }
     val all = series.flatMap { it.points }.filter { !it.second.isNaN() }
@@ -82,6 +85,15 @@ fun LineChart(series: List<Series>, modifier: Modifier = Modifier, height: Int =
             }
             drawPath(path, s.color, style = Stroke(width = s.width.dp.toPx(), cap = StrokeCap.Round,
                 pathEffect = if (s.dashed) PathEffect.dashPathEffect(floatArrayOf(10f, 10f)) else null))
+        }
+        for (m in marks) {
+            if (m.t < t0 || m.t > t1 || m.price.isNaN()) continue
+            val mx = x(m.t); val my = y(m.price); val r = 6.dp.toPx(); val gap = 5.dp.toPx()
+            val tri = Path()
+            if (m.buy) { tri.moveTo(mx, my + gap); tri.lineTo(mx - r, my + gap + r * 1.6f); tri.lineTo(mx + r, my + gap + r * 1.6f) }
+            else { tri.moveTo(mx, my - gap); tri.lineTo(mx - r, my - gap - r * 1.6f); tri.lineTo(mx + r, my - gap - r * 1.6f) }
+            tri.close()
+            drawPath(tri, if (m.buy) Xp.Gain else Xp.Loss)
         }
         val st = TextStyle(color = Xp.Slate, fontSize = 10.sp, fontFamily = Display)
         drawText(tm, dayFmt.format(Date(t0)), Offset(0f, h + 4.dp.toPx()), st)
