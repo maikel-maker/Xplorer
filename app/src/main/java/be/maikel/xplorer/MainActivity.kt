@@ -147,7 +147,7 @@ private fun App(vm: AppViewModel) {
         Column(Modifier.fillMaxSize().background(Xp.Abyss).padding(pad)) {
             Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(if (tab == 0) "Xplorer’" else if (tab == SETTINGS) "Réglages" else tabs[tab].label, style = MaterialTheme.typography.headlineMedium, color = Xp.Ice)
+                    Text(if (tab == 0) "SnipeX" else if (tab == SETTINGS) "Réglages" else tabs[tab].label, style = MaterialTheme.typography.headlineMedium, color = Xp.Ice)
                     Muted(if (s.loading) s.progress.ifEmpty { "Synchronisation…" } else lastSyncText(s.analysis?.snap?.lastSync))
                 }
                 if (s.loading) Box(Modifier.size(42.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.size(22.dp), color = Xp.Cyan, strokeWidth = 2.dp) }

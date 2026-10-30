@@ -1,6 +1,7 @@
 package be.maikel.xplorer.core
 
 import be.maikel.xplorer.data.Snapshot
+import be.maikel.xplorer.domain.Arena
 import be.maikel.xplorer.domain.AssetContext
 import be.maikel.xplorer.domain.Candle
 import be.maikel.xplorer.domain.DecisionEngine
@@ -62,6 +63,10 @@ data class Analysis(
     val achievements: Achievements.Summary? = null,
     /** Algorithme « marché mixte » simulé sur l'historique de chaque crypto. */
     val swing: Map<String, SwingAlgo.Result> = emptyMap(),
+    /** SnipeX : débat des agents par crypto, répartition de la semaine et test sur le passé. */
+    val arena: Map<String, Arena.Debate> = emptyMap(),
+    val arenaPlan: Arena.Plan? = null,
+    val arenaBacktest: Arena.Backtest? = null,
 )
 
 /** Semaines commençant le lundi (le 1er janvier 1970 était un jeudi). */
@@ -105,24 +110,23 @@ object Analyzer {
                 rules, now,
             )
         }
-        // DCA intelligent : multiplicateur selon le prix par rapport à sa moyenne 200 jours.
+        // SnipeX : l'arène des agents répartit le budget de la semaine, en entier, entre les cryptos du plan.
         val week = weekIndex(now)
         val weekly = budget ?: st.weeklyBudget
-        val reserve = reserveFor(st, week)
-        val reserveDays = if (reserve > 0.5 && st.dcaReserveSince != null) ((now - st.dcaReserveSince) / 86_400_000L).toInt() else 0
         val mayer = universe.associateWith { sym -> SmartDca.mayer(s.daily[sym] ?: emptyList(), s.prices[sym] ?: Double.NaN, now) }
-        val dca = SmartDca.plan(
-            weekly, reserve, reserveDays, mayer, st.targets, values,
+        val arena = universe.associateWith { sym -> Arena.debate(sym, s.daily[sym] ?: emptyList(), s.prices[sym] ?: Double.NaN) }
+        val arenaPlan = Arena.plan(
+            weekly, arena, st.targets, values,
             st.targets.keys.associateWith { st.maxFor(it) }, ledger.cryptoEur,
         )
-        val cashWarning = if (s.hasKey && ledger.cashEur + 0.5 < dca.total)
-            "Tu as ${Money.eur(ledger.cashEur, 0)} disponibles sur Coinbase : vire d'abord ${Money.eur(dca.total - ledger.cashEur, 0)}." else null
+        val cashWarning = if (s.hasKey && ledger.cashEur + 0.5 < arenaPlan.total)
+            "Tu as ${Money.eur(ledger.cashEur, 0)} disponibles sur Coinbase : vire d'abord ${Money.eur(arenaPlan.total - ledger.cashEur, 0)}." else null
         val plan = WeeklyPlan(
-            weekly,
-            dca.lines.map { l -> PlanLine(l.symbol, l.eur, l.note, if (l.eur > 0) Action.ACHETER else Action.ATTENDRE) },
-            dca.toReserve, dca.headline, cashWarning,
+            arenaPlan.weekly,
+            arenaPlan.lines.map { l -> PlanLine(l.symbol, l.eur, l.note, if (l.eur > 0) Action.ACHETER else Action.ATTENDRE) },
+            0.0, arenaPlan.headline, cashWarning,
         )
-        val swing = st.targets.keys.mapNotNull { sym -> s.daily[sym]?.let { d -> SwingAlgo.simulate(sym, d, st.weeklyBudget, noSell = sym == "GEOD")?.let { sym to it } } }.toMap()
+        val arenaBacktest = try { Arena.backtest(s.daily, st.targets, st.weeklyBudget) } catch (e: Exception) { null }
         // Achats « malins » : faits quand le prix était sous sa moyenne 200 jours ce jour-là.
         val smartBuys = ledger.trades.count { tr ->
             if (!tr.buy) return@count false
@@ -135,7 +139,6 @@ object Analyzer {
             ledger.trades.filter { st.startDate == null || it.t >= st.startDate }, declaredWeeks, capital,
             history?.maxDrawdown, beats, weights, st.targets, smartBuys, now,
         )
-        val backtests = st.targets.keys.mapNotNull { sym -> s.daily[sym]?.let { SmartDca.backtest(sym, it, weekly = st.weeklyBudget) } }
         val signals = universe.flatMap { sym ->
             Radar.scan(sym, s.daily[sym] ?: emptyList(), s.prices[sym] ?: Double.NaN, weights[sym] ?: 0.0, st.maxFor(sym), s.volume24Eur[sym])
         }
@@ -151,7 +154,8 @@ object Analyzer {
         if (ledger.externalNetEur != 0.0) issues += "Transferts de cryptos depuis ou vers l'extérieur : ${Money.signedEur(ledger.externalNetEur, 0)} (valeur à la date du transfert), exclus des gains."
 
         return Analysis(s, ledger, history, recs, plan, signals, health(s, ledger, history), capital, capitalManual, gain, gainPct, dayChange to dayPct, issues, sinceStart, history?.startValue, lifetimeGain,
-            dca, mayer, backtests, week, budget == null, cashWarning, achievements, swing)
+            null, mayer, emptyList(), week, budget == null, cashWarning, achievements, emptyMap(),
+            arena, arenaPlan, arenaBacktest)
     }
 
     private fun health(s: Snapshot, l: LedgerResult, h: PortfolioHistory?): Health {

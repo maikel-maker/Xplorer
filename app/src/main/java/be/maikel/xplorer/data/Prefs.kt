@@ -12,8 +12,8 @@ data class Settings(
     val watchlist: List<String> = listOf("SOL", "AKT", "NEAR"),
     val maxWeightDefault: Double = 0.5,
     val maxWeight: Map<String, Double> = emptyMap(),
-    val weeklyBudget: Double = 231.0,
-    val monthlyBudget: Double = 1000.0,
+    val weeklyBudget: Double = 225.0,
+    val monthlyBudget: Double = 975.0,
     val tolerance: String = "Équilibré",
     val horizonYears: Int = 5,
     val cashReserve: Double = 0.0,
@@ -50,9 +50,12 @@ class Prefs(context: Context) {
         sp.getString("settings", null)?.let { json.decodeFromString<Settings>(it) } ?: Settings()
     } catch (e: Exception) { Settings() })
 
-    /** v1 du DCA intelligent : budget de 1 000 €/mois (≈ 231 €/semaine), choisi le 30/10/2026. */
+    /** SnipeX (30/10/2026) : 225 € par semaine, répartis par l'arène. Plus de réserve « creux » : le budget part en entier. */
     private fun migrate(s: Settings): Settings =
-        if (s.dcaSchema >= 1) s else s.copy(monthlyBudget = 1000.0, weeklyBudget = 231.0, dcaSchema = 1).also { save(it) }
+        if (s.dcaSchema >= 2) s else s.copy(
+            monthlyBudget = 975.0, weeklyBudget = 225.0, dcaSchema = 2,
+            dcaReserveStart = 0.0, dcaReserveSince = null, dcaPendingDelta = 0.0,
+        ).also { save(it) }
 
     fun save(s: Settings) { sp.edit().putString("settings", json.encodeToString(s)).apply() }
 }

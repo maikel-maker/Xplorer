@@ -1,4 +1,4 @@
-# Installer Xplorer’ sur un Samsung
+# Installer SnipeX sur un Samsung
 
 1. Sur le téléphone, ouvre : https://github.com/maikel-maker/Xplorer/releases/latest/download/Xplorer.apk
 2. Ouvre le fichier téléchargé. Si Android demande l'autorisation d'installer des applications inconnues pour ton navigateur ou « Mes fichiers », accepte pour cette source.
@@ -6,7 +6,7 @@
 4. Au premier lancement, autorise les notifications si tu veux les alertes.
 5. Réglages › connecte ta clé Coinbase (voir COINBASE.md).
 
-Conseil Samsung : Paramètres › Applications › Xplorer’ › Batterie › **Non restreinte**, sinon One UI peut retarder fortement la synchronisation en arrière-plan.
+Conseil Samsung : Paramètres › Applications › SnipeX › Batterie › **Non restreinte**, sinon One UI peut retarder fortement la synchronisation en arrière-plan.
 
 ## Permissions Android
 

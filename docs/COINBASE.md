@@ -8,7 +8,7 @@
 6. **Create API key**. Copie tout de suite :
    - le **nom** (`organizations/…/apiKeys/…`) ;
    - la **clé privée** (`-----BEGIN EC PRIVATE KEY----- … -----END EC PRIVATE KEY-----`).
-7. Dans Xplorer’ : **Réglages › Coinbase en lecture seule**, colle les deux, puis **Connecter**.
+7. Dans SnipeX : **Réglages › Coinbase en lecture seule**, colle les deux, puis **Connecter**.
 
 La clé est vérifiée par un appel de lecture, puis chiffrée par le coffre-fort Android. Elle n'est jamais envoyée ailleurs qu'à Coinbase (pour signer chaque requête), jamais à un modèle d'IA, jamais dans un chat.
 

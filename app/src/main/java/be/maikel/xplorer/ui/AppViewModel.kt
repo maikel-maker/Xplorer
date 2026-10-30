@@ -199,7 +199,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val dao = repo.dao
         val ops = dao.ops(); val journal = dao.journal(); val corrections = dao.corrections()
         val obj = buildJsonObject {
-            put("app", "Xplorer’")
+            put("app", "SnipeX")
             put("exportedAt", Instant.now().toString())
             put("note", "Export sans la clé Coinbase.")
             putJsonArray("positions") {

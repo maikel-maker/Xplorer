@@ -1,10 +1,18 @@
-# Xplorer’
+# SnipeX
+
+App Android qui te dit chaque semaine quoi acheter avec tes 225 €. Six agents (🐂 Brutus, 🐻 Ursula, 🦊 Roxane, 🦉 Octave, 🐺 Volk, 🐢 Tortella) débattent crypto par crypto, bœufs contre ours, et leur verdict répartit le budget entre tes cryptos (part × 0,5 à × 1,5). Le budget part toujours en entier : rien n'est gardé de côté.
+
+Honnêteté : testée sur 8 ans (BTC, ETH, LINK, réglée sur la 1re moitié, vérifiée sur la 2e), l'arène fait jeu égal avec une répartition fixe. Elle rend la décision lisible et ludique, elle ne promet pas de battre le marché. L'app affiche son propre test sur le passé.
+
+Lecture seule sur Coinbase, aucun ordre passé. Ancien nom : Xplorer’ (mêmes données, même clé).
+
+# SnipeX
 
 Application Android personnelle de gestion patrimoniale crypto et d'aide à la décision, connectée à Coinbase **en lecture seule**.
 
 **Télécharger** : https://github.com/maikel-maker/Xplorer/releases/latest/download/Xplorer.apk
 
-Xplorer’ répond à cinq questions : ce que je possède vraiment, combien j'ai gagné ou perdu et pourquoi, s'il est statistiquement intéressant d'acheter, conserver ou vendre, quel montant est raisonnable, et ce que disent les données, y compris contre la recommandation. Quand les preuves manquent, il le dit.
+SnipeX répond à cinq questions : ce que je possède vraiment, combien j'ai gagné ou perdu et pourquoi, s'il est statistiquement intéressant d'acheter, conserver ou vendre, quel montant est raisonnable, et ce que disent les données, y compris contre la recommandation. Quand les preuves manquent, il le dit.
 
 - Aucune fonction d'achat, de vente ni de retrait n'existe dans le code (vérifié à chaque compilation).
 - La clé Coinbase est chiffrée par l'Android Keystore et ne quitte jamais le téléphone.

@@ -1,8 +1,8 @@
-name: Xplorer Android
+name: SnipeX Android
 
 on:
   push:
-    branches: [main]
+    branches: [main, snipex]
   workflow_dispatch:
 
 permissions:
@@ -100,8 +100,8 @@ jobs:
           if $BT/aapt2 dump permissions "$APK" | grep -viE "INTERNET|NETWORK_STATE|POST_NOTIFICATIONS|RECEIVE_BOOT_COMPLETED|WAKE_LOCK|FOREGROUND_SERVICE|DYNAMIC_RECEIVER|package:|uses-permission: name='be.maikel" | grep -i "uses-permission"; then
             echo "Permission inattendue"; exit 1
           fi
-          cp "$APK" Xplorer.apk
-          ls -la Xplorer.apk
+          cp "$APK" SnipeX.apk
+          ls -la SnipeX.apk
 
       - name: Erreurs lisibles
         if: failure()
@@ -121,8 +121,8 @@ jobs:
         if: ${{ github.ref != 'refs/heads/main' }}
         uses: actions/upload-artifact@v4
         with:
-          name: Xplorer-apk
-          path: Xplorer.apk
+          name: SnipeX-apk
+          path: SnipeX.apk
 
       - name: Pré-version de test (branches)
         if: ${{ github.ref != 'refs/heads/main' }}
@@ -131,8 +131,8 @@ jobs:
           tag_name: test-${{ github.ref_name }}-${{ github.run_number }}
           name: "TEST ${{ github.ref_name }} (${{ github.run_number }})"
           body: |
-            Version de test, non publiée comme version officielle. Installe Xplorer.apk pour essayer.
-          files: Xplorer.apk
+            Version de test, non publiée comme version officielle. Installe SnipeX.apk pour essayer.
+          files: SnipeX.apk
           prerelease: true
           make_latest: false
 
@@ -140,10 +140,10 @@ jobs:
         if: ${{ github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[no-release]') }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.0.${{ github.run_number }}
-          name: Xplorer’ 2.0.${{ github.run_number }}
+          tag_name: v3.0.${{ github.run_number }}
+          name: SnipeX 3.0.${{ github.run_number }}
           body: |
-            Xplorer’ natif (Kotlin + Jetpack Compose). Installe Xplorer.apk sur ton Samsung.
+            SnipeX natif (Kotlin + Jetpack Compose). Installe SnipeX.apk sur ton Samsung. Xplorer est remplacé : mêmes données, même clé Coinbase.
             Tests unitaires et contrôle « lecture seule » passés avant publication.
-          files: Xplorer.apk
+          files: SnipeX.apk
           make_latest: true

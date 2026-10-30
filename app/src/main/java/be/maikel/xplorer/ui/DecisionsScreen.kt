@@ -40,10 +40,10 @@ fun LazyListScope.decisionsScreen(s: UiState, onBudget: (Double) -> Unit, onAsse
     item {
         SectionTitle("Que faire cette semaine ?")
         Glass {
-            Muted("Budget de la semaine (1 000 €/mois ≈ 231 €/semaine)")
+            Muted("Budget de la semaine (225 € par défaut)")
             Spacer(Modifier.height(8.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(50.0, 100.0, 231.0, 500.0, 1000.0).forEach { b -> Pill(Money.eur(b, 0), plan.budget == b, { onBudget(b) }) }
+                listOf(50.0, 100.0, 225.0, 500.0, 1000.0).forEach { b -> Pill(Money.eur(b, 0), plan.budget == b, { onBudget(b) }) }
             }
             var free by remember { mutableStateOf("") }
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
@@ -129,14 +129,14 @@ fun LazyListScope.decisionsScreen(s: UiState, onBudget: (Double) -> Unit, onAsse
     item {
         val graded = s.journal.filter { it.verdict == "juste" || it.verdict == "raté" }
         val good = graded.count { it.verdict == "juste" }
-        SectionTitle("Xplorer’ avait-il raison ?")
+        SectionTitle("SnipeX avait-il raison ?")
         Glass {
             if (graded.isEmpty()) {
                 Text("Pas encore de note", style = MaterialTheme.typography.titleMedium, color = Xp.Ice)
                 Muted("Chaque conseil est enregistré tel quel puis noté après 21 jours : un achat est juste si le prix a monté, une vente si le prix a baissé. « Attendre » et « Conserver » ne sont pas notés.")
             } else {
                 Text("$good / ${graded.size}", style = MaterialTheme.typography.displayLarge, color = Xp.Gold)
-                Muted("conseils justes, soit ${Money.pct(good.toDouble() / graded.size)}. Sous 50 %, Xplorer’ ne fait pas mieux qu'une pièce jetée en l'air.")
+                Muted("conseils justes, soit ${Money.pct(good.toDouble() / graded.size)}. Sous 50 %, SnipeX ne fait pas mieux qu'une pièce jetée en l'air.")
             }
             Spacer(Modifier.height(8.dp))
             s.journal.take(40).forEach { j ->

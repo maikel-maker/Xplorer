@@ -39,17 +39,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.style.TextAlign
 import be.maikel.xplorer.core.Analysis
 import be.maikel.xplorer.domain.Achievements
-import be.maikel.xplorer.domain.SwingAlgo
 import be.maikel.xplorer.domain.Money
-import be.maikel.xplorer.domain.SmartDca
 import java.util.Calendar
 import androidx.compose.runtime.Composable
-
-private fun feuColor(f: SmartDca.Feu): Color = when (f) {
-    SmartDca.Feu.VERT -> Xp.Gain
-    SmartDca.Feu.JAUNE -> Color(0xFFF2D35B)
-    SmartDca.Feu.ORANGE -> Xp.Amber
-}
 
 private fun hello(): String = when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
     in 5..11 -> "Bonjour Maïkel"
@@ -58,7 +50,7 @@ private fun hello(): String = when (Calendar.getInstance().get(Calendar.HOUR_OF_
 }
 
 /**
- * Accueil simplifié : ton argent, la consigne de la semaine, un feu par crypto.
+ * Accueil SnipeX : ton argent, la consigne de la semaine, l'arène des agents.
  * Aucun mot technique ici : tout le détail reste dans l'onglet « Détails ».
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -97,7 +89,6 @@ fun LazyListScope.simpleHome(
 
     // 2. La consigne de la semaine.
     val buys = a.plan.lines.filter { it.eur > 0 }
-    val dca = a.dca
     item {
         Spacer(Modifier.height(14.dp))
         val shape = RoundedCornerShape(22.dp)
@@ -107,12 +98,12 @@ fun LazyListScope.simpleHome(
                 .border(1.dp, Xp.Gold.copy(alpha = 0.45f), shape)
                 .padding(22.dp),
         ) {
-            Text("📅  Cette semaine", style = MaterialTheme.typography.titleMedium, color = Xp.Gold)
+            Text("📅  Cette semaine · ${Money.eur(a.plan.budget, 0)}", style = MaterialTheme.typography.titleMedium, color = Xp.Gold)
             Spacer(Modifier.height(10.dp))
             if (buys.isEmpty()) {
-                Text("Tu n'achètes rien.", style = MaterialTheme.typography.titleLarge, color = Xp.Ice)
+                Text("Rien à acheter.", style = MaterialTheme.typography.titleLarge, color = Xp.Ice)
                 Spacer(Modifier.height(4.dp))
-                Text("Les prix sont trop hauts. Garde ${Money.eur(a.plan.budget, 0)} de côté sur Coinbase : ils serviront quand ça baissera.", style = MaterialTheme.typography.bodyLarge, color = Xp.Ice)
+                Text(a.plan.headline, style = MaterialTheme.typography.bodyLarge, color = Xp.Ice)
             } else {
                 Text("Achète :", style = MaterialTheme.typography.bodyLarge, color = Xp.Slate)
                 buys.forEach { b ->
@@ -122,14 +113,8 @@ fun LazyListScope.simpleHome(
                         Text(Money.eur(b.eur, 0), style = MaterialTheme.typography.titleLarge, color = Xp.Ice)
                     }
                 }
-                if (dca != null && dca.toReserve >= SmartDca.MIN_ORDER) {
-                    Spacer(Modifier.height(6.dp))
-                    Text("Et garde ${Money.eur(dca.toReserve, 0)} de côté : certains prix sont trop hauts.", style = MaterialTheme.typography.bodyMedium, color = Xp.Ice)
-                }
-                if (dca != null && dca.fromReserve >= 1) {
-                    Spacer(Modifier.height(6.dp))
-                    Text("Les prix sont bas : tu utilises ${Money.eur(dca.fromReserve, 0)} de l'argent mis de côté.", style = MaterialTheme.typography.bodyMedium, color = Xp.Ice)
-                }
+                Spacer(Modifier.height(6.dp))
+                Text("Les agents de l'arène ont choisi la répartition. Les ${Money.eur(a.plan.budget, 0)} partent en entier : on ne garde rien de côté.", style = MaterialTheme.typography.bodyMedium, color = Xp.Slate)
                 a.plan.cashWarning?.let { Spacer(Modifier.height(8.dp)); Banner(it) }
                 Spacer(Modifier.height(14.dp))
                 Button(
@@ -146,49 +131,18 @@ fun LazyListScope.simpleHome(
     // 3. Réussites : série, niveau, médailles.
     a.achievements?.let { ach -> item { achievementsCard(ach) } }
 
-    // 4. Un feu par crypto.
-    item {
-        SectionTitle("Tes cryptos en un coup d'œil")
-        val syms = (a.snap.settings.targets.keys + l.positions.filter { it.value > 1 }.map { it.symbol })
-            .filter { it != "USDC" && it != "EURC" }.distinct()
-        Glass(padding = 8) {
-            syms.forEachIndexed { i, sym ->
-                val f = SmartDca.feu(a.mayer[sym])
-                val buy = a.plan.lines.firstOrNull { it.symbol == sym }?.eur ?: 0.0
-                val pos = l.positions.firstOrNull { it.symbol == sym }
-                val target = a.snap.settings.targets[sym] ?: 0.0
-                val enough = target > 0 && pos != null && pos.weight >= target
-                val sentence = when {
-                    buy > 0 -> "Achète ${Money.eur(buy, 0)} cette semaine."
-                    target <= 0 -> "Pas dans ton plan, on le garde à l'œil."
-                    enough -> "Tu en as déjà assez, on attend."
-                    f == SmartDca.Feu.ORANGE -> "Trop cher pour l'instant, on attend."
-                    else -> "Rien à faire cette semaine."
-                }
-                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable { onAsset(sym) }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(14.dp).clip(CircleShape).background(feuColor(f)))
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(coinName(sym), style = MaterialTheme.typography.titleMedium, color = Xp.Ice)
-                        Text("${f.emoji} ${f.label}", style = MaterialTheme.typography.bodyMedium, color = feuColor(f))
-                        Text(sentence, style = MaterialTheme.typography.bodyMedium, color = Xp.Slate)
-                    }
-                    pos?.let { Text(Money.eur(it.value, 0), style = MaterialTheme.typography.titleMedium, color = Xp.Ice) }
-                }
-                if (i < syms.size - 1) Divider()
-            }
-        }
-    }
+    // 4. L'arène : bœufs contre ours, crypto par crypto.
+    if (a.arena.isNotEmpty()) item { arenaCard(a, onAsset) }
 
-    // 5. L'algorithme « marché mixte » : achats et ventes simulés sur le graphique.
-    if (a.swing.isNotEmpty()) item { swingCard(a) }
+    // 5. L'arène a-t-elle raison ? Test honnête sur le passé.
+    if (a.arenaBacktest != null) item { arenaBacktestCard(a) }
 
     // 6. Pour aller plus loin.
     item {
         Spacer(Modifier.height(14.dp))
         Glass(onClick = onDetails) {
             Text("🔍  Voir les détails", style = MaterialTheme.typography.titleMedium, color = Xp.Cyan)
-            Muted("Graphiques, indicateurs, test sur le passé, historique des conseils.", small = false)
+            Muted("Graphiques, indicateurs, budget libre, historique des conseils.", small = false)
         }
         Spacer(Modifier.height(10.dp))
         Muted("Conseils seulement, jamais de garantie de gain.", Modifier.padding(horizontal = 8.dp), small = false)
@@ -256,50 +210,5 @@ private fun achievementsCard(ach: Achievements.Summary) {
         }
         Spacer(Modifier.height(8.dp))
         Muted("Les médailles se débloquent toutes seules avec tes vrais achats sur Coinbase.")
-    }
-}
-
-@Composable
-private fun swingCard(a: Analysis) {
-    val syms = a.swing.keys.toList()
-    var sel by rememberSaveable { mutableStateOf(syms.firstOrNull { it == "BTC" } ?: syms.first()) }
-    val r = a.swing[sel] ?: a.swing.values.first()
-    SectionTitle("📈 L'algo pour marché mixte")
-    Glass {
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            syms.forEach { s -> Pill(coinName(s), sel == s, { sel = s }) }
-        }
-        Spacer(Modifier.height(10.dp))
-        val candles = a.snap.daily[r.symbol].orEmpty().takeLast(365)
-        val from = candles.firstOrNull()?.t ?: 0L
-        LineChart(
-            listOf(Series(coinName(r.symbol), candles.map { it.t to it.close }, Xp.Cyan, fill = true)),
-            height = 200,
-            marks = r.events.filter { it.t >= from }.map { Mark(it.t, it.price, it.buy) },
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(top = 6.dp)) {
-            Tag("▲ achat de l'algo", Xp.Gain); Tag("▼ vente de l'algo", Xp.Loss)
-        }
-        Spacer(Modifier.height(10.dp))
-        val e = r.edge
-        val months = r.days / 30
-        Text(
-            if (e >= 0) "Sur $months mois, l'algo aurait fait ${Money.pct(e, true)} de mieux qu'acheter chaque semaine sans réfléchir."
-            else "Sur $months mois, l'algo aurait fait ${Money.pct(-e)} de moins qu'acheter chaque semaine sans réfléchir.",
-            style = MaterialTheme.typography.bodyLarge, color = if (e >= 0) Xp.Gain else Xp.Loss,
-        )
-        Spacer(Modifier.height(6.dp))
-        val last = r.events.lastOrNull()
-        Text(
-            when {
-                r.today != null -> "🔔 Signal récent : ${if (r.today.buy) "achat" else "vente de 10 %"}. ${r.today.reason}."
-                last != null -> "Dernier signal : ${if (last.buy) "achat" else "vente"} le ${java.text.SimpleDateFormat("d MMM", java.util.Locale.FRANCE).format(java.util.Date(last.t))}. Pas de signal aujourd'hui."
-                else -> "Aucun signal sur la période."
-            },
-            style = MaterialTheme.typography.bodyMedium, color = Xp.Ice,
-        )
-        if (r.symbol == "GEOD") Muted("Geodnet : l'algo n'affiche que des achats (ta règle : jamais de vente sous ×20).")
-        Spacer(Modifier.height(6.dp))
-        Muted("${SwingAlgo.NAME} : achète quand ça a beaucoup baissé, vend 10 % quand ça s'emballe sans vraie tendance. Simulation sur le passé avec ${Money.eur(a.snap.settings.weeklyBudget, 0)}/semaine, frais compris. Il perd quand le marché monte fort et longtemps.")
     }
 }

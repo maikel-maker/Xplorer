@@ -15,5 +15,5 @@ Exécutés à chaque compilation par GitHub Actions. Une publication n'a lieu qu
 - **APK** : signature vérifiée (`apksigner verify`), permissions contrôlées.
 
 ## Non testé automatiquement
-- Les endpoints authentifiés (comptes, transactions, exécutions) : impossible sans ta clé, qui ne doit jamais être mise dans GitHub. Ils sont validés à ta première connexion, et l'écran « Ce qu'Xplorer’ a lu chez Coinbase » permet de vérifier.
+- Les endpoints authentifiés (comptes, transactions, exécutions) : impossible sans ta clé, qui ne doit jamais être mise dans GitHub. Ils sont validés à ta première connexion, et l'écran « Ce qu'SnipeX a lu chez Coinbase » permet de vérifier.
 - L'interface sur ton téléphone (aucun appareil Android disponible pour le développeur).

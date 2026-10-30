@@ -23,7 +23,7 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = versionCodeEnv
-        versionName = "2.0.$versionCodeEnv"
+        versionName = "3.0.$versionCodeEnv"
     }
 
     signingConfigs {

@@ -1,4 +1,4 @@
-# Architecture d'Xplorer’
+# Architecture d'SnipeX
 
 Application Android native : **Kotlin + Jetpack Compose**, architecture en couches (Clean Architecture simplifiée, MVVM).
 

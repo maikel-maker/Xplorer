@@ -196,7 +196,7 @@ fun LazyListScope.settingsScreen(s: UiState, st: Settings, act: SettingsActions)
             TextButton(onClick = {
                 act.update { it.copy(quietStart = num(qs)?.toInt()?.coerceIn(0, 23) ?: it.quietStart, quietEnd = num(qe)?.toInt()?.coerceIn(0, 23) ?: it.quietEnd, maxAlertsPerDay = num(mx)?.toInt()?.coerceIn(1, 50) ?: it.maxAlertsPerDay) }
             }) { Text("Enregistrer", color = Xp.Cyan) }
-            Muted("Xplorer’ vérifie environ toutes les heures quand le téléphone est connecté. Android peut espacer ces vérifications en économie d'énergie : ce n'est pas une surveillance permanente. Les doublons sont supprimés et les alertes restent dans l'historique.")
+            Muted("SnipeX vérifie environ toutes les heures quand le téléphone est connecté. Android peut espacer ces vérifications en économie d'énergie : ce n'est pas une surveillance permanente. Les doublons sont supprimés et les alertes restent dans l'historique.")
         }
     }
     item {
@@ -221,7 +221,7 @@ fun LazyListScope.settingsScreen(s: UiState, st: Settings, act: SettingsActions)
         }
     }
     item {
-        SectionTitle("Ce qu'Xplorer’ a lu chez Coinbase")
+        SectionTitle("Ce qu'SnipeX a lu chez Coinbase")
         Glass {
             val ops = s.analysis?.snap?.ops ?: emptyList()
             if (ops.isEmpty()) Muted("Rien de lu pour l'instant.")
@@ -235,7 +235,7 @@ fun LazyListScope.settingsScreen(s: UiState, st: Settings, act: SettingsActions)
     item {
         SectionTitle("Données personnelles")
         Glass {
-            Muted("Tout reste sur ce téléphone : pas de serveur Xplorer’, pas de télémétrie, pas de sauvegarde cloud.", small = false)
+            Muted("Tout reste sur ce téléphone : pas de serveur SnipeX, pas de télémétrie, pas de sauvegarde cloud.", small = false)
             TextButton(onClick = act.export) { Text("Exporter mes données (JSON, sans la clé)", color = Xp.Cyan) }
             var confirm by remember { mutableStateOf(false) }
             TextButton(onClick = { confirm = true }) { Text("Tout supprimer", color = Xp.Loss) }
@@ -253,7 +253,7 @@ fun LazyListScope.settingsScreen(s: UiState, st: Settings, act: SettingsActions)
         Glass {
             KV("Version", be.maikel.xplorer.BuildConfig.VERSION_NAME)
             KV("Permissions Android", "Internet, notifications")
-            Muted("Xplorer’ ne contient aucune fonction d'achat, de vente ou de retrait : ce n'est pas une option désactivée, le code n'existe pas. Aucun signal n'est une garantie de bénéfice. Ce n'est pas un conseil financier.")
+            Muted("SnipeX ne contient aucune fonction d'achat, de vente ou de retrait : ce n'est pas une option désactivée, le code n'existe pas. Aucun signal n'est une garantie de bénéfice. Ce n'est pas un conseil financier.")
         }
         Spacer(Modifier.height(30.dp))
     }
