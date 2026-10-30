@@ -128,6 +128,13 @@ private val coinColors = mapOf(
 )
 fun coinColor(sym: String): Color = coinColors[sym] ?: Color(0xFF7F8EA9)
 
+private val coinNames = mapOf(
+    "BTC" to "Bitcoin", "ETH" to "Ethereum", "GEOD" to "Geodnet", "LINK" to "Chainlink", "TAO" to "Bittensor",
+    "KRL" to "Kryll", "SOL" to "Solana", "NEAR" to "Near", "AKT" to "Akash", "USDC" to "Dollar numérique (USDC)",
+)
+/** Nom en clair d'une crypto (le symbole si inconnu). */
+fun coinName(sym: String): String = coinNames[sym] ?: sym
+
 @Composable
 fun CoinBadge(sym: String, size: Int = 40) {
     val c = coinColor(sym)

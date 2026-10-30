@@ -31,14 +31,14 @@ fun LazyListScope.portfolioScreen(a: Analysis?, onAsset: (String) -> Unit) {
                 CoinBadge(p.symbol)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(p.symbol, style = MaterialTheme.typography.titleMedium, color = Xp.Ice)
-                    Muted("${Money.qty(p.qty)} à ${if (p.priceKnown) Money.price(p.price) else "prix inconnu"}")
+                    Text(coinName(p.symbol), style = MaterialTheme.typography.titleMedium, color = Xp.Ice)
+                    Muted("${Money.qty(p.qty)} ${p.symbol}")
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(Money.eur(p.value), style = MaterialTheme.typography.titleMedium, color = Xp.Ice)
                     p.unrealized?.let { u ->
                         val base = p.costBasis
-                        Text("${Money.signedEur(u)}${if (base > 0) " (" + Money.pct(u / base, true) + ")" else ""}", style = MaterialTheme.typography.labelMedium, color = if (u >= 0) Xp.Gain else Xp.Loss)
+                        Text(if (u >= 0) "gagné ${Money.eur(u, 0)}" else "perdu ${Money.eur(-u, 0)}", style = MaterialTheme.typography.labelMedium, color = if (u >= 0) Xp.Gain else Xp.Loss)
                     }
                 }
             }
@@ -46,15 +46,23 @@ fun LazyListScope.portfolioScreen(a: Analysis?, onAsset: (String) -> Unit) {
             val target = st.targets[p.symbol]
             WeightBar(p.weight, target, color = if (p.weight > st.maxFor(p.symbol)) Xp.Loss else Xp.Cyan)
             Spacer(Modifier.height(6.dp))
-            Row {
-                Muted("${Money.pct(p.weight)} des cryptos" + (target?.let { " · cible ${Money.pct(it)}" } ?: " · hors répartition"), Modifier.weight(1f))
-                Muted("PRU ${if (p.avgCost.isNaN()) "inconnu" else Money.price(p.avgCost)}")
-            }
-            if (p.unknownQty > 0 && p.priceKnown && p.unknownQty * p.price > 1) Muted("${Money.qty(p.unknownQty)} sans historique d'achat : prix de revient inconnu pour cette part.")
-            if (p.rewardsQty > 0) Muted("Dont ${Money.qty(p.rewardsQty)} reçus en récompenses (coût zéro).")
-            if (p.realized != 0.0) Muted("Gains réalisés : ${Money.signedEur(p.realized)} · frais payés : ${Money.eur(p.fees)}")
+            Muted(target?.let { t ->
+                val w = (p.weight * 100).toInt(); val tt = (t * 100).toInt()
+                when {
+                    p.weight > t * 1.1 -> "$w % de tes cryptos. Ton objectif : $tt %. Tu en as plus que prévu."
+                    p.weight < t * 0.9 -> "$w % de tes cryptos. Ton objectif : $tt %. Il en manque un peu."
+                    else -> "$w % de tes cryptos. Pile dans ton objectif ($tt %)."
+                }
+            } ?: "${(p.weight * 100).toInt()} % de tes cryptos. Pas dans ton plan.", small = false)
         }
     }
+}
+
+/** Santé, scénarios et répartition (onglet Détails). */
+fun LazyListScope.healthScreen(a: Analysis?) {
+    if (a == null) { item { Muted("Chargement…") }; return }
+    val st = a.snap.settings
+    val l = a.ledger
     item {
         SectionTitle("Carte de santé")
         Glass {

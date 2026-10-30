@@ -141,6 +141,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** « C'est fait » : déclare d'un coup tous les achats du plan de la semaine. */
+    fun addIntents(lines: List<Pair<String, Double>>) {
+        if (lines.isEmpty()) return
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            lines.forEach { (sym, eur) -> repo.dao.addIntent(IntentEntity(t = now, symbol = sym, eur = eur)) }
+            _state.update { it.copy(notice = "Bien noté ! On vérifiera tes achats sur Coinbase à la prochaine mise à jour.") }
+            recompute()
+        }
+    }
+
     /** Correction manuelle du capital apporté, avec trace dans le journal d'audit. */
     fun setCapital(value: Double?, note: String) {
         viewModelScope.launch {

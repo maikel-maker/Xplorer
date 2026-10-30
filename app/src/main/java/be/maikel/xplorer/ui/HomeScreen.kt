@@ -27,7 +27,8 @@ import androidx.compose.ui.unit.sp
 import be.maikel.xplorer.core.Analysis
 import be.maikel.xplorer.domain.Money
 
-fun LazyListScope.homeScreen(a: Analysis?, hasKey: Boolean, onAsset: (String) -> Unit, onTab: (Int) -> Unit) {
+/** Vue détaillée (ancien accueil), désormais dans l'onglet Détails. */
+fun LazyListScope.overviewScreen(a: Analysis?, hasKey: Boolean, onAsset: (String) -> Unit, onTab: (Int) -> Unit) {
     if (a == null) { item { Muted("Chargement…") }; return }
     val l = a.ledger
     item {

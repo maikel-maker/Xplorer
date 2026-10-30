@@ -32,6 +32,20 @@ object SmartDca {
         Band(Double.POSITIVE_INFINITY, 0.0, "Euphorie : on n'achète pas", "🔴"),
     )
 
+    /** Feu simple pour l'accueil (vocabulaire choisi par Maïkel). */
+    enum class Feu(val emoji: String, val label: String) {
+        VERT("🟢", "Bon moment pour acheter"),
+        JAUNE("🟡", "Prix moyen"),
+        ORANGE("🟠", "Trop cher, on attend"),
+    }
+
+    fun feu(mm: Double?): Feu = when {
+        mm == null || mm.isNaN() -> Feu.JAUNE
+        mm < 1.0 -> Feu.VERT
+        mm < 1.8 -> Feu.JAUNE
+        else -> Feu.ORANGE
+    }
+
     fun band(mm: Double?): Band? = if (mm == null || mm.isNaN()) null else bands.first { mm < it.upTo }
     fun multiplier(mm: Double?): Double = band(mm)?.mult ?: 1.0
 
