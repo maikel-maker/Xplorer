@@ -124,6 +124,18 @@ jobs:
           name: Xplorer-apk
           path: Xplorer.apk
 
+      - name: Pré-version de test (branches)
+        if: ${{ github.ref != 'refs/heads/main' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: test-${{ github.ref_name }}-${{ github.run_number }}
+          name: "TEST ${{ github.ref_name }} (${{ github.run_number }})"
+          body: |
+            Version de test, non publiée comme version officielle. Installe Xplorer.apk pour essayer.
+          files: Xplorer.apk
+          prerelease: true
+          make_latest: false
+
       - name: Publication
         if: ${{ github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[no-release]') }}
         uses: softprops/action-gh-release@v2
