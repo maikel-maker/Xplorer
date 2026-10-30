@@ -95,6 +95,7 @@ fun AssetScreen(a: Analysis?, sym: String, chart: ChartData?, onLoad: (TF) -> Un
         Muted("Pince pour zoomer, glisse pour te déplacer, touche un triangle pour le détail de l'opération.")
     }
 
+    var tech by remember { mutableStateOf(false) }
     LazyColumn(Modifier.fillMaxSize().background(Xp.Abyss), contentPadding = PaddingValues(16.dp)) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -115,14 +116,26 @@ fun AssetScreen(a: Analysis?, sym: String, chart: ChartData?, onLoad: (TF) -> Un
                 TextButton(onClick = { full = true }) { Text("Plein écran", color = Xp.Cyan) }
             }
         }
-        rec?.let { r -> item { RecommendationCard(r, a?.plan?.lines?.firstOrNull { it.symbol == sym }?.eur) { intent = true } } }
+        // En clair d'abord : vert = acheter, orange = attendre, rouge = vente possible.
+        rec?.let { r -> item { SimpleVerdictCard(r, sym, a?.plan?.lines?.firstOrNull { it.symbol == sym }?.eur) { intent = true } } }
         a?.arena?.get(sym)?.let { d ->
             item {
                 SectionTitle("📊 Bulls vs Bears")
                 Glass(padding = 16) { BullsBearsPanel(d) }
             }
         }
-        rec?.let { r -> item { WhyCard(r) } }
+        // Le détail technique reste disponible, replié par défaut.
+        rec?.let { r ->
+            item {
+                TextButton(onClick = { tech = !tech }, modifier = Modifier.padding(top = 8.dp)) {
+                    Text(if (tech) "Masquer le détail technique ▲" else "Voir le détail technique ▼", color = Xp.Cyan)
+                }
+            }
+            if (tech) {
+                item { RecommendationCard(r, a?.plan?.lines?.firstOrNull { it.symbol == sym }?.eur) { intent = true } }
+                item { WhyCard(r) }
+            }
+        }
         pos?.let { p ->
             item {
                 SectionTitle("Ta position")

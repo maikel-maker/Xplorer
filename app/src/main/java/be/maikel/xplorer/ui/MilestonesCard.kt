@@ -164,30 +164,18 @@ fun cryptoCards(a: Analysis, onAsset: (String) -> Unit) {
             // Petite analyse technique.
             val rec = a.recs[sym]
             val d = a.arena[sym]
-            val bull = d != null && d.score > 0.15
-            val bear = d != null && d.score < -0.15
-            val tone = when {
-                rec != null && rec.action.isSell -> Vivid.Bears
-                rec != null && rec.action.isBuy -> Vivid.Bulls
-                bull -> Vivid.Bulls
-                bear -> Vivid.Bears
-                else -> Xp.Slate
+            val (tone, label) = when {
+                rec == null || rec.action == Action.INSUFFISANT -> Feu.Orange to "🟠 Pas assez d'infos"
+                rec.action.isBuy -> Feu.Vert to "🟢 Bon moment pour acheter"
+                rec.action.isSell -> Feu.Rouge to (if (sym == "GEOD") "🔴 Ça chauffe, on garde" else "🔴 Prudence, vente possible")
+                else -> Feu.Orange to "🟠 On attend"
             }
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(tone.copy(alpha = 0.12f))
-                    .border(1.dp, tone.copy(alpha = 0.4f), RoundedCornerShape(14.dp)).padding(10.dp),
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(tone.copy(alpha = 0.16f))
+                    .border(1.dp, tone.copy(alpha = 0.5f), RoundedCornerShape(14.dp)).padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(Modifier.weight(1f)) {
-                    Text("Analyse technique", style = MaterialTheme.typography.labelMedium, color = Xp.Slate)
-                    Text(
-                        when {
-                            rec == null || rec.action == Action.INSUFFISANT -> "Pas assez de données"
-                            else -> "${rec.action.label} · score ${rec.score}/100"
-                        },
-                        style = MaterialTheme.typography.titleSmall, color = tone,
-                    )
-                }
+                Text(label, style = MaterialTheme.typography.titleSmall, color = tone, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 if (d != null) Text("Bulls ${d.bulls} · ${d.bears} Bears", style = MaterialTheme.typography.labelMedium, color = Xp.Ice)
             }
             Spacer(Modifier.height(6.dp))
