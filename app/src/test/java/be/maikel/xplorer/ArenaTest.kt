@@ -25,21 +25,21 @@ class ArenaTest {
         // Hausse régulière et modérée : tendance haussière sans surchauffe extrême.
         val d = Arena.debate("BTC", series(400) { 100.0 * Math.pow(1.002, it.toDouble()) + 3 * sin(it / 3.0) })
         assertTrue("score ${d.score}", d.score > 0)
-        assertEquals(Arena.Camp.BOEUF, d.votes.first { it.agent == Arena.BRUTUS }.camp)
+        assertEquals(Arena.Camp.BULLS, d.votes.first { it.agent == Arena.TREND }.camp)
     }
 
     @Test fun longCrashMakesBearsTrendVote() {
         val d = Arena.debate("BTC", series(400) { 1000.0 * Math.pow(0.996, it.toDouble()) })
-        assertEquals(Arena.Camp.OURS, d.votes.first { it.agent == Arena.BRUTUS }.camp)
-        // Roxane voit des soldes dans la chute.
-        assertEquals(Arena.Camp.BOEUF, d.votes.first { it.agent == Arena.ROXANE }.camp)
+        assertEquals(Arena.Camp.BEARS, d.votes.first { it.agent == Arena.TREND }.camp)
+        // Le signal « soldes » voit une occasion dans la chute.
+        assertEquals(Arena.Camp.BULLS, d.votes.first { it.agent == Arena.DIP }.camp)
     }
 
     @Test fun shortHistoryAgentsAbstain() {
         val d = Arena.debate("GEOD", series(40) { 0.2 })
-        assertTrue(d.votes.first { it.agent == Arena.BRUTUS }.abstain)
-        assertTrue(d.votes.first { it.agent == Arena.OCTAVE }.abstain)
-        assertTrue(!d.votes.first { it.agent == Arena.TORTELLA }.abstain)
+        assertTrue(d.votes.first { it.agent == Arena.TREND }.abstain)
+        assertTrue(d.votes.first { it.agent == Arena.VALUE }.abstain)
+        assertTrue(!d.votes.first { it.agent == Arena.STEADY }.abstain)
         val empty = Arena.debate("XXX", emptyList())
         assertEquals(0.0, empty.score, 0.0)
         assertEquals(1.0, empty.multiplier, 0.0)

@@ -116,6 +116,12 @@ fun AssetScreen(a: Analysis?, sym: String, chart: ChartData?, onLoad: (TF) -> Un
             }
         }
         rec?.let { r -> item { RecommendationCard(r, a?.plan?.lines?.firstOrNull { it.symbol == sym }?.eur) { intent = true } } }
+        a?.arena?.get(sym)?.let { d ->
+            item {
+                SectionTitle("📊 Bulls vs Bears")
+                Glass(padding = 16) { BullsBearsPanel(d) }
+            }
+        }
         rec?.let { r -> item { WhyCard(r) } }
         pos?.let { p ->
             item {

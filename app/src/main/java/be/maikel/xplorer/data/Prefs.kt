@@ -8,7 +8,7 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 data class Settings(
-    val targets: Map<String, Double> = mapOf("BTC" to 0.45, "ETH" to 0.20, "GEOD" to 0.20, "LINK" to 0.05, "TAO" to 0.05, "KRL" to 0.05),
+    val targets: Map<String, Double> = mapOf("BTC" to 0.55, "GEOD" to 0.20, "ETH" to 0.17, "LINK" to 0.05, "TAO" to 0.03),
     val watchlist: List<String> = listOf("SOL", "AKT", "NEAR"),
     val maxWeightDefault: Double = 0.5,
     val maxWeight: Map<String, Double> = emptyMap(),
@@ -50,12 +50,24 @@ class Prefs(context: Context) {
         sp.getString("settings", null)?.let { json.decodeFromString<Settings>(it) } ?: Settings()
     } catch (e: Exception) { Settings() })
 
-    /** SnipeX (30/10/2026) : 225 € par semaine, répartis par l'arène. Plus de réserve « creux » : le budget part en entier. */
-    private fun migrate(s: Settings): Settings =
-        if (s.dcaSchema >= 2) s else s.copy(
+    /**
+     * v2 (30/10/2026) : 225 € par semaine, répartis par l'arène, plus de réserve « creux ».
+     * v3 (30/10/2026) : KRL retiré ; cibles calées sur la répartition réelle de Maïkel (BTC 55 · GEOD 20 · ETH 17 · LINK 5 · TAO 3).
+     */
+    private fun migrate(s: Settings): Settings {
+        var m = s
+        if (m.dcaSchema < 2) m = m.copy(
             monthlyBudget = 975.0, weeklyBudget = 225.0, dcaSchema = 2,
             dcaReserveStart = 0.0, dcaReserveSince = null, dcaPendingDelta = 0.0,
-        ).also { save(it) }
+        )
+        if (m.dcaSchema < 3) m = m.copy(
+            targets = Settings().targets,
+            watchlist = m.watchlist - "KRL",
+            dcaSchema = 3,
+        )
+        if (m != s) save(m)
+        return m
+    }
 
     fun save(s: Settings) { sp.edit().putString("settings", json.encodeToString(s)).apply() }
 }

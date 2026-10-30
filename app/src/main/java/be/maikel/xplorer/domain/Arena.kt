@@ -7,8 +7,7 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * L'Arène SnipeX : des agents avec chacun leur caractère débattent, crypto par crypto,
- * comme des bœufs (ça va monter) contre des ours (ça va baisser).
+ * L'Arène SnipeX : six signaux votent, crypto par crypto, Bulls (ça va monter) contre Bears (ça va baisser).
  *
  * Ce que l'arène décide : la RÉPARTITION du budget de la semaine entre tes cryptos.
  * Ce qu'elle ne décide jamais : garder de l'argent de côté. Le budget part en entier chaque semaine,
@@ -24,23 +23,23 @@ object Arena {
     /** Force du vote sur la répartition : score +1 → part × 1,5 ; score −1 → part × 0,5. */
     const val TILT = 0.5
 
-    enum class Camp(val label: String) { BOEUF("Bœuf"), OURS("Ours"), NEUTRE("Neutre") }
+    enum class Camp(val label: String) { BULLS("Bulls"), BEARS("Bears"), NEUTRE("Neutre") }
 
-    data class Agent(val id: String, val name: String, val emoji: String, val role: String)
+    data class Agent(val id: String, val name: String, val role: String)
 
-    val BRUTUS = Agent("brutus", "Brutus le Taureau", "🐂", "Suit la tendance de fond")
-    val URSULA = Agent("ursula", "Ursula l'Ourse", "🐻", "Flaire la surchauffe")
-    val ROXANE = Agent("roxane", "Roxane la Renarde", "🦊", "Chasse les soldes")
-    val OCTAVE = Agent("octave", "Octave le Hibou", "🦉", "Juge le prix juste")
-    val VOLK = Agent("volk", "Volk le Loup", "🐺", "Court avec l'élan")
-    val TORTELLA = Agent("tortella", "Tortella la Tortue", "🐢", "Ne rate jamais une semaine")
-    val agents = listOf(BRUTUS, URSULA, ROXANE, OCTAVE, VOLK, TORTELLA)
+    val TREND = Agent("trend", "Tendance de fond", "Moyennes 50 et 200 jours")
+    val HEAT = Agent("heat", "Surchauffe", "RSI 14 jours")
+    val DIP = Agent("dip", "Soldes", "Baisse depuis le plus haut de 3 mois")
+    val VALUE = Agent("value", "Prix juste", "Prix par rapport à sa moyenne 200 jours")
+    val MOMENTUM = Agent("momentum", "Élan", "Variation sur 30 jours")
+    val STEADY = Agent("steady", "Régularité", "Le DCA paie sur la durée")
+    val agents = listOf(TREND, HEAT, DIP, VALUE, MOMENTUM, STEADY)
 
     data class Vote(val agent: Agent, val score: Double, val quote: String, val abstain: Boolean = false) {
         val camp get() = when {
             abstain -> Camp.NEUTRE
-            score > 0.15 -> Camp.BOEUF
-            score < -0.15 -> Camp.OURS
+            score > 0 -> Camp.BULLS
+            score < 0 -> Camp.BEARS
             else -> Camp.NEUTRE
         }
     }
@@ -49,16 +48,16 @@ object Arena {
         private val active get() = votes.filter { !it.abstain }
         /** Score de l'arène, de −1 (ours écrasants) à +1 (bœufs écrasants). */
         val score: Double get() = if (active.isEmpty()) 0.0 else active.sumOf { it.score } / active.size
-        val bulls get() = votes.count { it.camp == Camp.BOEUF }
-        val bears get() = votes.count { it.camp == Camp.OURS }
+        val bulls get() = votes.count { it.camp == Camp.BULLS }
+        val bears get() = votes.count { it.camp == Camp.BEARS }
         /** Part des bœufs dans le rapport de force (0 à 1), pour la barre de l'arène. */
         val bullShare: Double get() = (score + 1) / 2
         val verdict: String get() = when {
-            score > 0.4 -> "Les bœufs écrasent les ours"
-            score > 0.15 -> "Les bœufs prennent l'avantage"
-            score < -0.4 -> "Les ours dominent l'arène"
-            score < -0.15 -> "Les ours prennent l'avantage"
-            else -> "Match serré"
+            score > 0.4 -> "Les Bulls dominent"
+            score > 0.15 -> "Avantage Bulls"
+            score < -0.4 -> "Les Bears dominent"
+            score < -0.15 -> "Avantage Bears"
+            else -> "Égalité Bulls / Bears"
         }
         val multiplier: Double get() = (1 + TILT * score).coerceIn(1 - TILT, 1 + TILT)
     }
@@ -87,47 +86,47 @@ object Arena {
         val p = c[i]
         val votes = ArrayList<Vote>()
 
-        // 🐂 Brutus : la tendance de fond (moyennes 50 et 200 jours).
+        // Tendance de fond (moyennes 50 et 200 jours).
         val s50 = x.sma50[i]; val s200 = x.sma200[i]
-        votes += if (!ok(s50, s200)) Vote(BRUTUS, 0.0, "Il me faut 200 jours d'historique pour juger la tendance.", abstain = true)
+        votes += if (!ok(s50, s200)) Vote(TREND, 0.0, "Moins de 200 jours d'historique.", abstain = true)
         else when {
-            s50 > s200 && p > s50 -> Vote(BRUTUS, 1.0, "La tendance de fond monte, je charge !")
-            s50 < s200 && p < s50 -> Vote(BRUTUS, -1.0, "La tendance de fond descend. Je ne fonce pas dans un mur.")
-            p > s200 -> Vote(BRUTUS, 0.3, "Au-dessus de sa moyenne 200 jours, mais la tendance hésite.")
-            else -> Vote(BRUTUS, -0.3, "Sous sa moyenne 200 jours. J'attends que ça reparte.")
+            s50 > s200 && p > s50 -> Vote(TREND, 1.0, "La tendance de fond monte.")
+            s50 < s200 && p < s50 -> Vote(TREND, -1.0, "La tendance de fond descend.")
+            p > s200 -> Vote(TREND, 0.3, "Au-dessus de sa moyenne 200 jours, mais la tendance hésite.")
+            else -> Vote(TREND, -0.3, "Sous sa moyenne 200 jours, pas encore de reprise.")
         }
 
-        // 🐻 Ursula : la surchauffe (RSI 14 jours).
+        // Surchauffe (RSI 14 jours).
         val r = x.rsi[i]
-        votes += if (!ok(r)) Vote(URSULA, 0.0, "Pas assez de jours pour mesurer la fièvre.", abstain = true)
+        votes += if (!ok(r)) Vote(HEAT, 0.0, "Pas assez d'historique.", abstain = true)
         else when {
-            r > 75 -> Vote(URSULA, -1.0, "Fièvre à ${r.roundToInt()}/100 : ça a monté trop vite, ça va redescendre.")
-            r > 65 -> Vote(URSULA, -0.6, "Ça chauffe (${r.roundToInt()}/100). Je grogne.")
-            r < 30 -> Vote(URSULA, 0.4, "Même moi je l'avoue : la peur est exagérée (${r.roundToInt()}/100).")
-            else -> Vote(URSULA, -0.1, "Température normale (${r.roundToInt()}/100). Je surveille quand même.")
+            r > 75 -> Vote(HEAT, -1.0, "RSI ${r.roundToInt()} : monté trop vite, risque de repli.")
+            r > 65 -> Vote(HEAT, -0.6, "RSI ${r.roundToInt()} : ça chauffe.")
+            r < 30 -> Vote(HEAT, 0.4, "RSI ${r.roundToInt()} : peur exagérée, zone d'achat.")
+            else -> Vote(HEAT, -0.1, "RSI ${r.roundToInt()} : température normale.")
         }
 
-        // 🦊 Roxane : les soldes (baisse depuis le plus haut de 90 jours).
-        if (i < 89) votes += Vote(ROXANE, 0.0, "Il me faut 3 mois de prix pour repérer les soldes.", abstain = true)
+        // Soldes (baisse depuis le plus haut de 90 jours).
+        if (i < 89) votes += Vote(DIP, 0.0, "Moins de 3 mois d'historique.", abstain = true)
         else {
             var hi = 0.0
             for (k in i - 89..i) hi = max(hi, c[k])
             val dd = p / hi - 1
             votes += when {
-                dd < -0.30 -> Vote(ROXANE, 1.0, "${pct(dd)} depuis son plus haut de 3 mois : grosses soldes !")
-                dd < -0.20 -> Vote(ROXANE, 0.6, "${pct(dd)} depuis son plus haut : belles soldes.")
-                dd < -0.10 -> Vote(ROXANE, 0.3, "${pct(dd)} depuis son plus haut : petite remise.")
-                else -> Vote(ROXANE, -0.2, "Seulement ${pct(dd)} sous son plus haut. Pas de soldes en vue.")
+                dd < -0.30 -> Vote(DIP, 1.0, "${pct(dd)} depuis son plus haut de 3 mois : grosses soldes.")
+                dd < -0.20 -> Vote(DIP, 0.6, "${pct(dd)} depuis son plus haut : belles soldes.")
+                dd < -0.10 -> Vote(DIP, 0.3, "${pct(dd)} depuis son plus haut : petite remise.")
+                else -> Vote(DIP, -0.2, "Seulement ${pct(dd)} sous son plus haut : pas de soldes.")
             }
         }
 
-        // 🦉 Octave : le prix juste (prix / moyenne 200 jours).
-        votes += if (!ok(s200) || s200 <= 0) Vote(OCTAVE, 0.0, "Sans 200 jours d'historique, je ne connais pas le prix juste.", abstain = true)
+        // Prix juste (prix / moyenne 200 jours).
+        votes += if (!ok(s200) || s200 <= 0) Vote(VALUE, 0.0, "Moins de 200 jours d'historique.", abstain = true)
         else {
             val mm = p / s200
             val sc = ((1.2 - mm) / 0.6).coerceIn(-1.0, 1.0)
             val gap = pct(mm - 1)
-            Vote(OCTAVE, sc, when {
+            Vote(VALUE, sc, when {
                 mm < 0.8 -> "$gap par rapport à son prix moyen : c'est bradé."
                 mm < 1.0 -> "$gap par rapport à son prix moyen : sous sa valeur habituelle."
                 mm < 1.5 -> "$gap par rapport à son prix moyen : prix correct."
@@ -135,21 +134,21 @@ object Arena {
             })
         }
 
-        // 🐺 Volk : l'élan (variation sur 30 jours).
-        votes += if (i < 30 || !(c[i - 30] > 0)) Vote(VOLK, 0.0, "Pas encore un mois de prix pour sentir l'élan.", abstain = true)
+        // Élan (variation sur 30 jours).
+        votes += if (i < 30 || !(c[i - 30] > 0)) Vote(MOMENTUM, 0.0, "Moins d'un mois d'historique.", abstain = true)
         else {
             val m = p / c[i - 30] - 1
             val sc = (m / 0.3).coerceIn(-1.0, 1.0)
-            Vote(VOLK, sc, when {
-                m > 0.15 -> "${pct(m)} en un mois : la meute court, je suis !"
+            Vote(MOMENTUM, sc, when {
+                m > 0.15 -> "${pct(m)} en un mois : fort élan."
                 m > 0 -> "${pct(m)} en un mois : léger élan vers le haut."
                 m > -0.15 -> "${pct(m)} en un mois : l'élan s'essouffle."
-                else -> "${pct(m)} en un mois : la meute fuit."
+                else -> "${pct(m)} en un mois : forte baisse."
             })
         }
 
-        // 🐢 Tortella : la régularité, toujours un peu bœuf.
-        votes += Vote(TORTELLA, 0.3, "Peu importe le bruit : on achète chaque semaine, c'est ça qui paie.")
+        // Régularité : toujours légèrement Bulls (le DCA continue).
+        votes += Vote(STEADY, 0.3, "Acheter chaque semaine reste la base, quoi qu'il arrive.")
         return Debate(symbol, votes)
     }
 

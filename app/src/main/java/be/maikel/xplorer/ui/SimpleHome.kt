@@ -87,7 +87,9 @@ fun LazyListScope.simpleHome(
     }
 
     // 2. La consigne de la semaine.
-    val buys = a.plan.lines.filter { it.eur > 0 }
+    // Ordre : de ta plus grosse crypto à la plus petite.
+    val held = l.positions.associate { it.symbol to it.value }
+    val buys = a.plan.lines.filter { it.eur > 0 }.sortedByDescending { held[it.symbol] ?: 0.0 }
     item {
         Spacer(Modifier.height(14.dp))
         val shape = RoundedCornerShape(22.dp)
@@ -106,14 +108,26 @@ fun LazyListScope.simpleHome(
             } else {
                 Text("Achète :", style = MaterialTheme.typography.bodyLarge, color = Xp.Slate)
                 buys.forEach { b ->
-                    Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val d = a.arena[b.symbol]
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable { onAsset(b.symbol) }.padding(vertical = 6.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         CoinBadge(b.symbol, 30); Spacer(Modifier.width(10.dp))
-                        Text(coinName(b.symbol), style = MaterialTheme.typography.titleMedium, color = Xp.Ice, modifier = Modifier.weight(1f))
+                        Column(Modifier.weight(1f)) {
+                            Text(coinName(b.symbol), style = MaterialTheme.typography.titleMedium, color = Xp.Ice)
+                            if (d != null) Text(
+                                when { d.score > 0.15 -> "Bulls · part renforcée"; d.score < -0.15 -> "Bears · part réduite"; else -> "Neutre · part normale" },
+                                style = MaterialTheme.typography.labelMedium,
+                                color = when { d.score > 0.15 -> Vivid.Bulls; d.score < -0.15 -> Vivid.Bears; else -> Xp.Slate },
+                            )
+                        }
                         Text(Money.eur(b.eur, 0), style = MaterialTheme.typography.titleLarge, color = Xp.Ice)
+                        Text("  ›", style = MaterialTheme.typography.titleLarge, color = Xp.Slate)
                     }
                 }
                 Spacer(Modifier.height(6.dp))
-                Text("Les agents de l'arène ont choisi la répartition. Les ${Money.eur(a.plan.budget, 0)} partent en entier : on ne garde rien de côté.", style = MaterialTheme.typography.bodyMedium, color = Xp.Slate)
+                Text("Touche une crypto pour son analyse détaillée. Les Bulls / Bears ajustent la répartition. Les ${Money.eur(a.plan.budget, 0)} partent en entier : on ne garde rien de côté.", style = MaterialTheme.typography.bodyMedium, color = Xp.Slate)
                 a.plan.cashWarning?.let { Spacer(Modifier.height(8.dp)); Banner(it) }
                 Spacer(Modifier.height(14.dp))
                 Button(
@@ -127,13 +141,16 @@ fun LazyListScope.simpleHome(
         }
     }
 
-    // 3. Paliers réalistes : 1 ETH, 1 000 € de cryptos…
-    a.milestones?.let { m -> item { milestonesCard(m) } }
+    // 3. Le trésor crypto et ses paliers.
+    a.milestones?.let { m -> item { wealthCard(m) } }
 
     // 4. L'arène : bœufs contre ours, crypto par crypto.
     if (a.arena.isNotEmpty()) item { arenaCard(a, onAsset) }
 
-    // 5. L'arène a-t-elle raison ? Test honnête sur le passé.
+    // 5. Mes cryptos : chiffres, palier et analyse technique (touche une carte pour tout voir).
+    if (a.milestones != null) item { cryptoCards(a, onAsset) }
+
+    // 6. L'arène a-t-elle raison ? Test honnête sur le passé.
     if (a.arenaBacktest != null) item { arenaBacktestCard(a) }
 
     // 6. Pour aller plus loin.
