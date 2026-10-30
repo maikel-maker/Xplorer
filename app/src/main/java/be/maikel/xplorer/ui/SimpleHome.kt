@@ -70,15 +70,20 @@ fun LazyListScope.simpleHome(
     // 1. Ton argent, en une phrase.
     item {
         Glass(padding = 22) {
-            Muted("Tout ton argent sur Coinbase", small = false)
-            Text(Money.eur(l.totalEur, 0), style = MaterialTheme.typography.displayLarge, color = Xp.Ice)
             if (hasKey) {
-                val g = a.gain
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    if (g >= 0) "Tu as gagné ${Money.eur(g, 0)} depuis le début 🙂" else "Tu es à ${Money.eur(-g, 0)} sous ce que tu as mis. C'est normal en crypto, on vise le long terme.",
-                    style = MaterialTheme.typography.bodyLarge, color = if (g >= 0) Xp.Gain else Xp.Ice,
-                )
+                // Juste les faits : ce que tu as mis en DCA, et ce que tu possèdes aujourd'hui.
+                Muted(a.snap.settings.startDate?.let { "Mon DCA depuis le " + java.text.SimpleDateFormat("d MMMM yyyy", java.util.Locale.FRANCE).format(java.util.Date(it)) } ?: "Mon DCA", small = false)
+                Spacer(Modifier.height(10.dp))
+                Row(Modifier.fillMaxWidth()) {
+                    Column(Modifier.weight(1f)) {
+                        Muted("J'ai mis", small = false)
+                        Text(Money.eur(a.capital, 0), style = MaterialTheme.typography.headlineMedium, color = Xp.Ice)
+                    }
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                        Muted("Je possède", small = false)
+                        Text(Money.eur(l.totalEur, 0), style = MaterialTheme.typography.headlineMedium, color = Xp.Ice)
+                    }
+                }
             } else {
                 Spacer(Modifier.height(10.dp))
                 Banner("Connecte ton compte Coinbase (lecture seule) pour voir ton vrai argent. Touche ici.", error = false) { onSettings() }
