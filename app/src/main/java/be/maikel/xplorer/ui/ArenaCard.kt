@@ -37,6 +37,17 @@ import be.maikel.xplorer.domain.Money
 private val Bull = Color(0xFF3EE39A)
 private val Bear = Color(0xFFFF5F76)
 
+/** Chaque agent a sa couleur. */
+private fun agentColor(id: String): Color = when (id) {
+    "brutus" -> Color(0xFFFF7A59)
+    "ursula" -> Color(0xFF8B5CFF)
+    "roxane" -> Color(0xFFFF9F1C)
+    "octave" -> Color(0xFFFFC94D)
+    "volk" -> Color(0xFF3FD8F2)
+    "tortella" -> Color(0xFF7CF29A)
+    else -> Xp.Slate
+}
+
 private fun campColor(c: Arena.Camp): Color = when (c) {
     Arena.Camp.BOEUF -> Bull
     Arena.Camp.OURS -> Bear
@@ -99,21 +110,26 @@ fun arenaCard(a: Analysis, onAsset: (String) -> Unit) {
 @Composable
 private fun agentRow(v: Arena.Vote) {
     val c = campColor(v.camp)
-    val shape = RoundedCornerShape(16.dp)
+    val ac = agentColor(v.agent.id)
+    val shape = RoundedCornerShape(18.dp)
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(shape)
-            .background(c.copy(alpha = if (v.abstain) 0.04f else 0.09f))
-            .border(1.dp, c.copy(alpha = if (v.abstain) 0.12f else 0.35f), shape)
+        Modifier.fillMaxWidth().padding(vertical = 5.dp).clip(shape)
+            .background(Brush.horizontalGradient(listOf(ac.copy(alpha = if (v.abstain) 0.08f else 0.22f), Xp.Night)))
+            .border(1.dp, Brush.horizontalGradient(listOf(ac.copy(alpha = if (v.abstain) 0.2f else 0.8f), c.copy(alpha = 0.25f))), shape)
             .padding(12.dp),
         verticalAlignment = Alignment.Top,
     ) {
-        Box(Modifier.size(42.dp).clip(CircleShape).background(Xp.Night2), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.size(46.dp).clip(CircleShape)
+                .background(Brush.radialGradient(listOf(ac.copy(alpha = 0.9f), ac.copy(alpha = 0.25f)))),
+            contentAlignment = Alignment.Center,
+        ) {
             Text(v.agent.emoji, style = MaterialTheme.typography.titleLarge)
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(v.agent.name, style = MaterialTheme.typography.titleSmall, color = Xp.Ice, modifier = Modifier.weight(1f))
+                Text(v.agent.name, style = MaterialTheme.typography.titleSmall, color = ac, modifier = Modifier.weight(1f))
                 Tag(if (v.abstain) "S'abstient" else v.camp.label, c)
             }
             Muted(v.agent.role)

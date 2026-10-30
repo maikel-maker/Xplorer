@@ -9,6 +9,7 @@ import be.maikel.xplorer.domain.History
 import be.maikel.xplorer.domain.Indicators
 import be.maikel.xplorer.domain.Ledger
 import be.maikel.xplorer.domain.LedgerResult
+import be.maikel.xplorer.domain.Milestones
 import be.maikel.xplorer.domain.Money
 import be.maikel.xplorer.domain.PortfolioHistory
 import be.maikel.xplorer.domain.Radar
@@ -67,6 +68,8 @@ data class Analysis(
     val arena: Map<String, Arena.Debate> = emptyMap(),
     val arenaPlan: Arena.Plan? = null,
     val arenaBacktest: Arena.Backtest? = null,
+    /** Paliers réalistes (1 ETH, 1 000 € de cryptos…). */
+    val milestones: Milestones.Summary? = null,
 )
 
 /** Semaines commençant le lundi (le 1er janvier 1970 était un jeudi). */
@@ -126,6 +129,12 @@ object Analyzer {
             arenaPlan.lines.map { l -> PlanLine(l.symbol, l.eur, l.note, if (l.eur > 0) Action.ACHETER else Action.ATTENDRE) },
             0.0, arenaPlan.headline, cashWarning,
         )
+        val milestones = Milestones.compute(
+            (st.targets.keys + ledger.positions.filter { it.value > 1 }.map { it.symbol }).filter { it != "USDC" && it != "EURC" && it != "EUR" },
+            ledger.positions.associate { it.symbol to it.qty },
+            s.prices, ledger.cryptoEur,
+            arenaPlan.lines.associate { it.symbol to it.eur }, arenaPlan.total,
+        )
         val arenaBacktest = try { Arena.backtest(s.daily, st.targets, st.weeklyBudget) } catch (e: Exception) { null }
         // Achats « malins » : faits quand le prix était sous sa moyenne 200 jours ce jour-là.
         val smartBuys = ledger.trades.count { tr ->
@@ -155,7 +164,7 @@ object Analyzer {
 
         return Analysis(s, ledger, history, recs, plan, signals, health(s, ledger, history), capital, capitalManual, gain, gainPct, dayChange to dayPct, issues, sinceStart, history?.startValue, lifetimeGain,
             null, mayer, emptyList(), week, budget == null, cashWarning, achievements, emptyMap(),
-            arena, arenaPlan, arenaBacktest)
+            arena, arenaPlan, arenaBacktest, milestones)
     }
 
     private fun health(s: Snapshot, l: LedgerResult, h: PortfolioHistory?): Health {

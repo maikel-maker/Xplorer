@@ -38,7 +38,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.style.TextAlign
 import be.maikel.xplorer.core.Analysis
-import be.maikel.xplorer.domain.Achievements
 import be.maikel.xplorer.domain.Money
 import java.util.Calendar
 import androidx.compose.runtime.Composable
@@ -94,8 +93,8 @@ fun LazyListScope.simpleHome(
         val shape = RoundedCornerShape(22.dp)
         Column(
             Modifier.fillMaxWidth().clip(shape)
-                .background(Brush.linearGradient(listOf(Color(0x33E8BE6E), Color(0x14E8BE6E))))
-                .border(1.dp, Xp.Gold.copy(alpha = 0.45f), shape)
+                .background(Brush.linearGradient(listOf(Color(0x66FFC94D), Color(0x40FF4FA3), Color(0x338B5CFF))))
+                .border(1.dp, Brush.linearGradient(Vivid.Rainbow), shape)
                 .padding(22.dp),
         ) {
             Text("📅  Cette semaine · ${Money.eur(a.plan.budget, 0)}", style = MaterialTheme.typography.titleMedium, color = Xp.Gold)
@@ -128,8 +127,8 @@ fun LazyListScope.simpleHome(
         }
     }
 
-    // 3. Réussites : série, niveau, médailles.
-    a.achievements?.let { ach -> item { achievementsCard(ach) } }
+    // 3. Paliers réalistes : 1 ETH, 1 000 € de cryptos…
+    a.milestones?.let { m -> item { milestonesCard(m) } }
 
     // 4. L'arène : bœufs contre ours, crypto par crypto.
     if (a.arena.isNotEmpty()) item { arenaCard(a, onAsset) }
@@ -146,69 +145,5 @@ fun LazyListScope.simpleHome(
         }
         Spacer(Modifier.height(10.dp))
         Muted("Conseils seulement, jamais de garantie de gain.", Modifier.padding(horizontal = 8.dp), small = false)
-    }
-}
-
-
-@Composable
-private fun Progress(v: Double, color: Color, modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(Xp.Night2)) {
-        Box(Modifier.fillMaxWidth(v.toFloat().coerceIn(0f, 1f)).fillMaxHeight().clip(RoundedCornerShape(4.dp))
-            .background(Brush.horizontalGradient(listOf(color.copy(alpha = 0.7f), color))))
-    }
-}
-
-private fun tierColor(t: Achievements.Tier): Color = when (t) {
-    Achievements.Tier.AUCUN -> Xp.Slate
-    Achievements.Tier.BRONZE -> Color(0xFFD08A57)
-    Achievements.Tier.ARGENT -> Color(0xFFC9D3E3)
-    Achievements.Tier.OR -> Xp.Gold
-    Achievements.Tier.DIAMANT -> Xp.Cyan
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun achievementsCard(ach: Achievements.Summary) {
-    SectionTitle("🏆 Mes réussites")
-    Glass(padding = 20) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Niveau ${ach.level} · ${ach.levelName}", style = MaterialTheme.typography.titleLarge, color = Xp.Gold)
-                Muted("${ach.points} points · prochain niveau à ${ach.nextLevelAt}", small = false)
-            }
-            Text(if (ach.streakWeeks > 0) "🔥 ${ach.streakWeeks}" else "🔥 0", style = MaterialTheme.typography.headlineMedium, color = if (ach.streakWeeks > 0) Xp.Amber else Xp.Slate)
-        }
-        Spacer(Modifier.height(8.dp))
-        Progress((ach.points % 400) / 400.0, Xp.Gold)
-        Spacer(Modifier.height(6.dp))
-        Text(
-            when (ach.streakWeeks) {
-                0 -> "Achète cette semaine pour lancer ta série 🔥"
-                1 -> "1 semaine de série. Continue la semaine prochaine !"
-                else -> "${ach.streakWeeks} semaines d'affilée. Ne casse pas la série !"
-            },
-            style = MaterialTheme.typography.bodyMedium, color = Xp.Ice,
-        )
-        Spacer(Modifier.height(14.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), maxItemsInEachRow = 3) {
-            ach.badges.forEach { b ->
-                val c = tierColor(b.tier)
-                Column(
-                    Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(c.copy(alpha = if (b.unlocked) 0.14f else 0.05f))
-                        .border(1.dp, c.copy(alpha = if (b.unlocked) 0.5f else 0.15f), RoundedCornerShape(16.dp)).padding(10.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(b.tier.emoji, style = MaterialTheme.typography.headlineMedium)
-                    Text(b.title, style = MaterialTheme.typography.labelMedium, color = if (b.unlocked) Xp.Ice else Xp.Slate, textAlign = TextAlign.Center, maxLines = 2)
-                    if (b.next != null) {
-                        Spacer(Modifier.height(4.dp))
-                        Progress(b.progress, c)
-                        Text("${b.value.toInt()}/${b.next.toInt()}${if (b.unit == "€") " €" else ""}", style = MaterialTheme.typography.labelSmall, color = Xp.Slate)
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        Muted("Les médailles se débloquent toutes seules avec tes vrais achats sur Coinbase.")
     }
 }
