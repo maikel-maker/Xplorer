@@ -117,8 +117,15 @@ jobs:
           path: app/build/reports/tests/
           if-no-files-found: ignore
 
+      - name: APK de test (branches)
+        if: ${{ github.ref != 'refs/heads/main' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Xplorer-apk
+          path: Xplorer.apk
+
       - name: Publication
-        if: ${{ !contains(github.event.head_commit.message, '[no-release]') }}
+        if: ${{ github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[no-release]') }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v2.0.${{ github.run_number }}

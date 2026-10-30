@@ -9,12 +9,14 @@ import be.maikel.xplorer.domain.Indicators
 import be.maikel.xplorer.domain.Ledger
 import be.maikel.xplorer.domain.LedgerResult
 import be.maikel.xplorer.domain.Money
-import be.maikel.xplorer.domain.Planner
 import be.maikel.xplorer.domain.PortfolioHistory
 import be.maikel.xplorer.domain.Radar
 import be.maikel.xplorer.domain.Recommendation
 import be.maikel.xplorer.domain.Rules
 import be.maikel.xplorer.domain.Signal
+import be.maikel.xplorer.domain.SmartDca
+import be.maikel.xplorer.domain.PlanLine
+import be.maikel.xplorer.domain.Action
 import be.maikel.xplorer.domain.WeeklyPlan
 import kotlin.math.max
 import kotlin.math.sqrt
@@ -47,7 +49,25 @@ data class Analysis(
     val sinceStart: Boolean = false,
     val startValue: Double? = null,
     val lifetimeGain: Double = 0.0,
+    /** DCA intelligent (moteur principal du plan de la semaine). */
+    val dca: SmartDca.Plan? = null,
+    val mayer: Map<String, Double?> = emptyMap(),
+    val backtests: List<SmartDca.Backtest> = emptyList(),
+    /** Semaine du plan et indication si le budget est celui des réglages (seul ce cas fait évoluer la réserve). */
+    val dcaWeek: Long = 0,
+    val dcaDefaultBudget: Boolean = true,
+    val dcaCashWarning: String? = null,
 )
+
+/** Semaines commençant le lundi (le 1er janvier 1970 était un jeudi). */
+fun weekIndex(ms: Long): Long = Math.floorDiv(ms / 86_400_000L + 3, 7L)
+
+/** Réserve « creux » valable pour la semaine [week], en appliquant le changement de semaine s'il n'est pas encore enregistré. */
+fun reserveFor(st: be.maikel.xplorer.data.Settings, week: Long): Double = when (st.dcaWeek) {
+    null -> 0.0
+    week -> max(0.0, st.dcaReserveStart)
+    else -> max(0.0, st.dcaReserveStart + st.dcaPendingDelta)
+}
 
 object Analyzer {
 
@@ -80,11 +100,24 @@ object Analyzer {
                 rules, now,
             )
         }
-        val plan = Planner.plan(
-            budget ?: st.weeklyBudget, recs, values, st.targets,
+        // DCA intelligent : multiplicateur selon le prix par rapport à sa moyenne 200 jours.
+        val week = weekIndex(now)
+        val weekly = budget ?: st.weeklyBudget
+        val reserve = reserveFor(st, week)
+        val reserveDays = if (reserve > 0.5 && st.dcaReserveSince != null) ((now - st.dcaReserveSince) / 86_400_000L).toInt() else 0
+        val mayer = universe.associateWith { sym -> SmartDca.mayer(s.daily[sym] ?: emptyList(), s.prices[sym] ?: Double.NaN, now) }
+        val dca = SmartDca.plan(
+            weekly, reserve, reserveDays, mayer, st.targets, values,
             st.targets.keys.associateWith { st.maxFor(it) }, ledger.cryptoEur,
-            if (s.hasKey) ledger.cashEur else null,
         )
+        val cashWarning = if (s.hasKey && ledger.cashEur + 0.5 < dca.total)
+            "Tu as ${Money.eur(ledger.cashEur, 0)} disponibles sur Coinbase : vire d'abord ${Money.eur(dca.total - ledger.cashEur, 0)}." else null
+        val plan = WeeklyPlan(
+            weekly,
+            dca.lines.map { l -> PlanLine(l.symbol, l.eur, l.note, if (l.eur > 0) Action.ACHETER else Action.ATTENDRE) },
+            dca.toReserve, dca.headline, cashWarning,
+        )
+        val backtests = st.targets.keys.mapNotNull { sym -> s.daily[sym]?.let { SmartDca.backtest(sym, it, weekly = st.weeklyBudget) } }
         val signals = universe.flatMap { sym ->
             Radar.scan(sym, s.daily[sym] ?: emptyList(), s.prices[sym] ?: Double.NaN, weights[sym] ?: 0.0, st.maxFor(sym), s.volume24Eur[sym])
         }
@@ -99,7 +132,8 @@ object Analyzer {
         if (capitalManual) issues += "Capital apporté corrigé à la main : ${Money.eur(capital, 0)} (calcul automatique : ${Money.eur(autoCapital, 0)})."
         if (ledger.externalNetEur != 0.0) issues += "Transferts de cryptos depuis ou vers l'extérieur : ${Money.signedEur(ledger.externalNetEur, 0)} (valeur à la date du transfert), exclus des gains."
 
-        return Analysis(s, ledger, history, recs, plan, signals, health(s, ledger, history), capital, capitalManual, gain, gainPct, dayChange to dayPct, issues, sinceStart, history?.startValue, lifetimeGain)
+        return Analysis(s, ledger, history, recs, plan, signals, health(s, ledger, history), capital, capitalManual, gain, gainPct, dayChange to dayPct, issues, sinceStart, history?.startValue, lifetimeGain,
+            dca, mayer, backtests, week, budget == null, cashWarning)
     }
 
     private fun health(s: Snapshot, l: LedgerResult, h: PortfolioHistory?): Health {

@@ -63,6 +63,25 @@ object Pipeline {
                 messages += Triple("risque", "${p.symbol} — exposition au-dessus de ta limite", "${Money.pct(p.weight)} de tes cryptos pour une limite de ${Money.pct(st.maxFor(p.symbol))}.")
         }
 
+        // 5. DCA intelligent : la réserve « creux » évolue une fois par semaine (budget des réglages uniquement).
+        a.dca?.takeIf { a.dcaDefaultBudget }?.let { plan ->
+            val cur = repo.prefs.load()
+            val week = a.dcaWeek
+            var next = cur
+            if (cur.dcaWeek != week) {
+                val reserve = reserveFor(cur, week)
+                val since = when {
+                    reserve <= 0.5 -> null
+                    cur.dcaReserveSince == null -> now
+                    else -> cur.dcaReserveSince
+                }
+                next = next.copy(dcaWeek = week, dcaReserveStart = reserve, dcaReserveSince = since)
+                if (cur.dcaWeek != null) messages += Triple("dca", "Plan DCA de la semaine", plan.headline)
+            }
+            if (abs(next.dcaPendingDelta - plan.reserveDelta) > 0.5 || next !== cur) next = next.copy(dcaPendingDelta = plan.reserveDelta)
+            if (next != cur) repo.prefs.save(next)
+        }
+
         if (!notify || !st.notifications) return
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         val quiet = if (st.quietStart > st.quietEnd) hour >= st.quietStart || hour < st.quietEnd else hour in st.quietStart until st.quietEnd

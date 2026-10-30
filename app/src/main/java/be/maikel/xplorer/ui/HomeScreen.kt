@@ -80,8 +80,9 @@ fun LazyListScope.homeScreen(a: Analysis?, hasKey: Boolean, onAsset: (String) ->
         SectionTitle("À faire maintenant")
         Glass(onClick = { onTab(3) }) {
             if (top.isEmpty()) {
-                Text("Rien à faire pour l'instant", style = MaterialTheme.typography.titleMedium, color = Xp.Ice)
-                Muted("Aucun signal ne réunit assez d'arguments. Conserver les liquidités est aussi une décision.")
+                Text(a.plan.headline, style = MaterialTheme.typography.titleMedium, color = Xp.Ice)
+                a.plan.lines.filter { it.eur > 0 }.take(4).forEach { l -> Muted("${l.symbol} : ${Money.eur(l.eur, 0)}") }
+                Muted("Touche pour le détail du plan DCA intelligent.")
             } else {
                 top.take(3).forEach { r ->
                     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp).clickable { onAsset(r.symbol) }, verticalAlignment = Alignment.CenterVertically) {
@@ -93,7 +94,7 @@ fun LazyListScope.homeScreen(a: Analysis?, hasKey: Boolean, onAsset: (String) ->
                         ActionBadge(r.action)
                     }
                 }
-                Muted("Plan de la semaine : ${a.plan.headline}")
+                Muted("DCA intelligent : ${a.plan.headline}")
             }
         }
     }

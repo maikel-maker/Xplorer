@@ -12,8 +12,8 @@ data class Settings(
     val watchlist: List<String> = listOf("SOL", "AKT", "NEAR"),
     val maxWeightDefault: Double = 0.5,
     val maxWeight: Map<String, Double> = emptyMap(),
-    val weeklyBudget: Double = 125.0,
-    val monthlyBudget: Double = 500.0,
+    val weeklyBudget: Double = 231.0,
+    val monthlyBudget: Double = 1000.0,
     val tolerance: String = "Équilibré",
     val horizonYears: Int = 5,
     val cashReserve: Double = 0.0,
@@ -29,6 +29,15 @@ data class Settings(
     val capitalOverride: Double? = null,
     /** Point de départ du suivi (ms UTC). Par défaut le 28 septembre 2026, début de la série actuelle. null = depuis l'ouverture du compte. */
     val startDate: Long? = 1790553600000L,
+    /** DCA intelligent : réserve « creux » au début de la semaine en cours (€). */
+    val dcaReserveStart: Double = 0.0,
+    /** Depuis quand la réserve attend (ms UTC), null si vide. */
+    val dcaReserveSince: Long? = null,
+    /** Semaine (index) à laquelle la réserve a été arrêtée pour la dernière fois. */
+    val dcaWeek: Long? = null,
+    /** Variation de réserve prévue par le plan de la semaine en cours, appliquée au changement de semaine. */
+    val dcaPendingDelta: Double = 0.0,
+    val dcaSchema: Int = 0,
 ) {
     fun maxFor(sym: String) = maxWeight[sym] ?: maxWeightDefault
 }
@@ -37,9 +46,13 @@ class Prefs(context: Context) {
     private val sp = context.getSharedPreferences("xp_settings", Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
-    fun load(): Settings = try {
+    fun load(): Settings = migrate(try {
         sp.getString("settings", null)?.let { json.decodeFromString<Settings>(it) } ?: Settings()
-    } catch (e: Exception) { Settings() }
+    } catch (e: Exception) { Settings() })
+
+    /** v1 du DCA intelligent : budget de 1 000 €/mois (≈ 231 €/semaine), choisi le 30/10/2026. */
+    private fun migrate(s: Settings): Settings =
+        if (s.dcaSchema >= 1) s else s.copy(monthlyBudget = 1000.0, weeklyBudget = 231.0, dcaSchema = 1).also { save(it) }
 
     fun save(s: Settings) { sp.edit().putString("settings", json.encodeToString(s)).apply() }
 }
