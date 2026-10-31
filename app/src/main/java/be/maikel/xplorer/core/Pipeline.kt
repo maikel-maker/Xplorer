@@ -78,6 +78,27 @@ object Pipeline {
             }
         }
 
+        // 6. Bilan du mois : le premier jour où l'app tourne dans un nouveau mois.
+        run {
+            val cal = Calendar.getInstance()
+            val month = cal.get(Calendar.YEAR) * 12 + cal.get(Calendar.MONTH)
+            val cur = repo.prefs.load()
+            if (cur.recapMonth == null) repo.prefs.save(cur.copy(recapMonth = month))
+            else if (cur.recapMonth != month && a.journal != null) {
+                val prev = Calendar.getInstance().apply { add(Calendar.MONTH, -1) }
+                val name = java.text.SimpleDateFormat("MMMM", java.util.Locale.FRANCE).format(prev.time).replaceFirstChar { it.uppercase() }
+                val pm = prev.get(Calendar.MONTH); val py = prev.get(Calendar.YEAR)
+                val weeks = a.journal.weeks.filter { w -> Calendar.getInstance().apply { timeInMillis = w.start + 43_200_000L }.let { it.get(Calendar.MONTH) == pm && it.get(Calendar.YEAR) == py } }
+                val bought = weeks.sumOf { it.bought }
+                messages += Triple("bilan", "Bilan de $name", "${Money.eur(bought, 0)} investis, ${weeks.count { it.done }}/${weeks.size} semaines faites. Tu possèdes ${Money.eur(a.ledger.totalEur, 0)} pour ${Money.eur(a.capital, 0)} mis.")
+                repo.prefs.save(cur.copy(recapMonth = month))
+            }
+        }
+        // 7. Ne panique pas : grosse baisse du Bitcoin sur 7 jours.
+        a.btcWeek?.takeIf { it <= -0.15 }?.let { d ->
+            messages += Triple("calme", "Le marché baisse fort, garde ton plan", "Bitcoin ${Money.pct(d, true)} en 7 jours. C'est justement là que ton DCA achète moins cher : continue tes achats prévus, ne vends pas sous le coup de la peur.")
+        }
+
         if (!notify || !st.notifications) return
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         val quiet = if (st.quietStart > st.quietEnd) hour >= st.quietStart || hour < st.quietEnd else hour in st.quietStart until st.quietEnd

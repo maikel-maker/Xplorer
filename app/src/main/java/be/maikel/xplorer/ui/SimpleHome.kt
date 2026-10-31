@@ -91,6 +91,9 @@ fun LazyListScope.simpleHome(
         }
     }
 
+    // Ne panique pas : grosse baisse du Bitcoin.
+    a.btcWeek?.takeIf { it <= -0.15 }?.let { d -> item { calmBanner(d) } }
+
     // 2. La consigne de la semaine.
     // Ordre : de ta plus grosse crypto à la plus petite.
     val held = l.positions.associate { it.symbol to it.value }
@@ -123,10 +126,23 @@ fun LazyListScope.simpleHome(
                         CoinBadge(b.symbol, 30); Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
                             Text(coinName(b.symbol), style = MaterialTheme.typography.titleMedium, color = Xp.Ice)
-                            if (d != null) Text(
-                                when { d.score > 0.15 -> "Bulls · part renforcée"; d.score < -0.15 -> "Bears · part réduite"; else -> "Neutre · part normale" },
+                            // Pourquoi ce montant : la cible contre ce que tu as aujourd'hui.
+                            val target = a.snap.settings.targets[b.symbol] ?: 0.0
+                            val now = if (l.cryptoEur > 0) (held[b.symbol] ?: 0.0) / l.cryptoEur else 0.0
+                            val gap = now - target
+                            Text(
+                                "Cible ${Money.pct(target)} · tu as ${Money.pct(now)}" + when {
+                                    gap < -0.01 -> " → on rattrape"
+                                    gap > 0.01 -> " → on freine"
+                                    else -> " → pile dedans"
+                                },
                                 style = MaterialTheme.typography.labelMedium,
-                                color = when { d.score > 0.15 -> Vivid.Bulls; d.score < -0.15 -> Vivid.Bears; else -> Xp.Slate },
+                                color = when { gap < -0.01 -> Vivid.Sky; gap > 0.01 -> Vivid.Sun; else -> Xp.Slate },
+                            )
+                            if (d != null && (d.score > 0.15 || d.score < -0.15)) Text(
+                                if (d.score > 0) "Bulls" else "Bears",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (d.score > 0) Vivid.Bulls else Vivid.Bears,
                             )
                         }
                         Text(Money.eur(b.eur, 0), style = MaterialTheme.typography.titleLarge, color = Xp.Ice)
@@ -134,7 +150,7 @@ fun LazyListScope.simpleHome(
                     }
                 }
                 Spacer(Modifier.height(6.dp))
-                Text("Touche une crypto pour son analyse détaillée. Les Bulls / Bears ajustent la répartition. Les ${Money.eur(a.plan.budget, 0)} partent en entier : on ne garde rien de côté.", style = MaterialTheme.typography.bodyMedium, color = Xp.Slate)
+                Text("Les montants te ramènent pile à ta répartition. Touche une crypto pour son analyse.", style = MaterialTheme.typography.bodyMedium, color = Xp.Slate)
                 a.plan.cashWarning?.let { Spacer(Modifier.height(8.dp)); Banner(it) }
                 Spacer(Modifier.height(14.dp))
                 Button(
@@ -147,6 +163,9 @@ fun LazyListScope.simpleHome(
             }
         }
     }
+
+    // Journal : semaines faites, montants réels, frais.
+    if (a.journal != null) item { journalCard(a) }
 
     // 3. Le trésor crypto et ses paliers.
     a.milestones?.let { m -> item { wealthCard(m) } }

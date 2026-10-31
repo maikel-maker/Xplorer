@@ -38,6 +38,8 @@ data class Settings(
     /** Variation de réserve prévue par le plan de la semaine en cours, appliquée au changement de semaine. */
     val dcaPendingDelta: Double = 0.0,
     val dcaSchema: Int = 0,
+    /** Dernier mois (année × 12 + mois) pour lequel le bilan mensuel a été envoyé. */
+    val recapMonth: Int? = null,
 ) {
     fun maxFor(sym: String) = maxWeight[sym] ?: maxWeightDefault
 }

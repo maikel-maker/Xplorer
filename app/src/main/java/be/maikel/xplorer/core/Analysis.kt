@@ -9,6 +9,7 @@ import be.maikel.xplorer.domain.History
 import be.maikel.xplorer.domain.Indicators
 import be.maikel.xplorer.domain.Ledger
 import be.maikel.xplorer.domain.LedgerResult
+import be.maikel.xplorer.domain.DcaJournal
 import be.maikel.xplorer.domain.Milestones
 import be.maikel.xplorer.domain.Money
 import be.maikel.xplorer.domain.PortfolioHistory
@@ -70,6 +71,10 @@ data class Analysis(
     val arenaBacktest: Arena.Backtest? = null,
     /** Paliers réalistes (1 ETH, 1 000 € de cryptos…). */
     val milestones: Milestones.Summary? = null,
+    /** Journal du DCA : achats réels semaine par semaine, frais. */
+    val journal: DcaJournal.Summary? = null,
+    /** Variation du Bitcoin sur 7 jours (pour l'alerte « ne panique pas »). */
+    val btcWeek: Double? = null,
 )
 
 /** Nombre de lundis dans le mois de [ms] (4 ou 5). */
@@ -148,6 +153,14 @@ object Analyzer {
             s.prices, ledger.cryptoEur,
             arenaPlan.lines.associate { it.symbol to it.eur }, arenaPlan.total,
         )
+        val journal = DcaJournal.compute(ledger.trades, st.startDate ?: (now - 84 * 86_400_000L), now) { w ->
+            weeklyFromMonthly(st.monthlyBudget, w + 43_200_000L)
+        }
+        val btcWeek = s.daily["BTC"]?.takeIf { it.size > 8 }?.let { d ->
+            val nowP = s.prices["BTC"] ?: d.last().close
+            val ago = d[d.size - 8].close
+            if (ago > 0 && nowP > 0) nowP / ago - 1 else null
+        }
         val arenaBacktest = try { Arena.backtest(s.daily, st.targets, st.weeklyBudget) } catch (e: Exception) { null }
         // Achats « malins » : faits quand le prix était sous sa moyenne 200 jours ce jour-là.
         val smartBuys = ledger.trades.count { tr ->
@@ -177,7 +190,7 @@ object Analyzer {
 
         return Analysis(s, ledger, history, recs, plan, signals, health(s, ledger, history), capital, capitalManual, gain, gainPct, dayChange to dayPct, issues, sinceStart, history?.startValue, lifetimeGain,
             null, mayer, emptyList(), week, budget == null, cashWarning, achievements, emptyMap(),
-            arena, arenaPlan, arenaBacktest, milestones)
+            arena, arenaPlan, arenaBacktest, milestones, journal, btcWeek)
     }
 
     private fun health(s: Snapshot, l: LedgerResult, h: PortfolioHistory?): Health {
