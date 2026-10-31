@@ -12,8 +12,8 @@ data class Settings(
     val watchlist: List<String> = listOf("SOL", "AKT", "NEAR"),
     val maxWeightDefault: Double = 0.5,
     val maxWeight: Map<String, Double> = emptyMap(),
-    val weeklyBudget: Double = 225.0,
-    val monthlyBudget: Double = 975.0,
+    val weeklyBudget: Double = 250.0,
+    val monthlyBudget: Double = 1083.0,
     val tolerance: String = "Équilibré",
     val horizonYears: Int = 5,
     val cashReserve: Double = 0.0,
@@ -52,6 +52,7 @@ class Prefs(context: Context) {
 
     /**
      * v2 (30/10/2026) : 225 € par semaine, répartis par l'arène, plus de réserve « creux ».
+     * v5 (31/10/2026) : budget corrigé à 250 € par semaine.
      * v4 (30/10/2026) : KRL retiré ; cibles en chiffres ronds choisies par Maïkel (BTC 50 · ETH 20 · GEOD 20 · LINK 5 · TAO 5).
      */
     private fun migrate(s: Settings): Settings {
@@ -65,6 +66,7 @@ class Prefs(context: Context) {
             watchlist = m.watchlist - "KRL",
             dcaSchema = 4,
         )
+        if (m.dcaSchema < 5) m = m.copy(weeklyBudget = 250.0, monthlyBudget = 1083.0, dcaSchema = 5)
         if (m != s) save(m)
         return m
     }

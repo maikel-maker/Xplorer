@@ -9,7 +9,7 @@ import kotlin.math.ceil
  */
 object Milestones {
 
-    /** Échelles par crypto, en quantité. Pensées pour un budget d'environ 225 € par semaine. */
+    /** Échelles par crypto, en quantité. Pensées pour un budget d'environ 250 € par semaine. */
     val ladders: Map<String, List<Double>> = mapOf(
         "BTC" to listOf(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0),
         "ETH" to listOf(0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0),

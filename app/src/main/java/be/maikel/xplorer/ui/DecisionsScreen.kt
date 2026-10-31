@@ -40,10 +40,10 @@ fun LazyListScope.decisionsScreen(s: UiState, onBudget: (Double) -> Unit, onAsse
     item {
         SectionTitle("Que faire cette semaine ?")
         Glass {
-            Muted("Budget de la semaine (225 € par défaut)")
+            Muted("Budget de la semaine (250 € par défaut)")
             Spacer(Modifier.height(8.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(50.0, 100.0, 225.0, 500.0, 1000.0).forEach { b -> Pill(Money.eur(b, 0), plan.budget == b, { onBudget(b) }) }
+                listOf(50.0, 100.0, 250.0, 500.0, 1000.0).forEach { b -> Pill(Money.eur(b, 0), plan.budget == b, { onBudget(b) }) }
             }
             var free by remember { mutableStateOf("") }
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
