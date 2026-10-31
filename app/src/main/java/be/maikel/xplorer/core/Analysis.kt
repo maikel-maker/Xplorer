@@ -75,7 +75,12 @@ data class Analysis(
     val journal: DcaJournal.Summary? = null,
     /** Variation du Bitcoin sur 7 jours (pour l'alerte « ne panique pas »). */
     val btcWeek: Double? = null,
+    /** Détail de « J'ai mis » : chaque mouvement d'argent lu chez Coinbase depuis le point de départ. */
+    val capitalLines: List<CapitalLine> = emptyList(),
 )
+
+/** Un mouvement d'argent qui compte dans « J'ai mis ». [eur] positif = apport, négatif = retrait. */
+data class CapitalLine(val t: Long, val label: String, val eur: Double)
 
 /** Nombre de lundis dans le mois de [ms] (4 ou 5). */
 fun mondaysInMonth(ms: Long): Int {
@@ -153,6 +158,24 @@ object Analyzer {
             s.prices, ledger.cryptoEur,
             arenaPlan.lines.associate { it.symbol to it.eur }, arenaPlan.total,
         )
+        val capitalLines = buildList {
+            val start = st.startDate
+            if (sinceStart && start != null && history != null) add(CapitalLine(start, "Valeur de tes cryptos au départ", history.startValue ?: 0.0))
+            val from = if (sinceStart && start != null) History.dayOf(start) + 1 else Long.MIN_VALUE
+            s.ops.filter { op ->
+                ((op.type in Ledger.FIAT_FLOW && Ledger.isCash(op.cur)) || op.type in Ledger.EXTERNAL_TYPES) && History.dayOf(op.t) >= from
+            }.sortedByDescending { it.t }.forEach { op ->
+                val e = if (op.cur in Ledger.EURLIKE) op.amount else op.eur
+                val label = when (op.type) {
+                    "fiat_deposit" -> "Virement vers Coinbase"
+                    "fiat_withdrawal" -> "Retrait vers ta banque"
+                    "send" -> if (e < 0) "${op.cur} envoyé hors de Coinbase" else "${op.cur} reçu"
+                    "receive" -> "${op.cur} reçu de l'extérieur"
+                    else -> "${op.type} ${op.cur}"
+                }
+                add(CapitalLine(op.t, label, e))
+            }
+        }
         val journal = DcaJournal.compute(ledger.trades, st.startDate ?: (now - 84 * 86_400_000L), now) { w ->
             weeklyFromMonthly(st.monthlyBudget, w + 43_200_000L)
         }
@@ -190,7 +213,7 @@ object Analyzer {
 
         return Analysis(s, ledger, history, recs, plan, signals, health(s, ledger, history), capital, capitalManual, gain, gainPct, dayChange to dayPct, issues, sinceStart, history?.startValue, lifetimeGain,
             null, mayer, emptyList(), week, budget == null, cashWarning, achievements, emptyMap(),
-            arena, arenaPlan, arenaBacktest, milestones, journal, btcWeek)
+            arena, arenaPlan, arenaBacktest, milestones, journal, btcWeek, capitalLines)
     }
 
     private fun health(s: Snapshot, l: LedgerResult, h: PortfolioHistory?): Health {

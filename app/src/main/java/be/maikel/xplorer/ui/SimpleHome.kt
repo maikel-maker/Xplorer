@@ -69,7 +69,8 @@ fun LazyListScope.simpleHome(
 
     // 1. Ton argent, en une phrase.
     item {
-        Glass(padding = 22) {
+        var detail by rememberSaveable { mutableStateOf(false) }
+        Glass(padding = 22, onClick = if (hasKey) ({ detail = !detail }) else null) {
             if (hasKey) {
                 // Juste les faits : ce que tu as mis en DCA, et ce que tu possèdes aujourd'hui.
                 Muted(a.snap.settings.startDate?.let { "Mon DCA depuis le " + java.text.SimpleDateFormat("d MMMM yyyy", java.util.Locale.FRANCE).format(java.util.Date(it)) } ?: "Mon DCA", small = false)
@@ -83,6 +84,30 @@ fun LazyListScope.simpleHome(
                         Muted("Je possède", small = false)
                         Text(Money.eur(l.totalEur, 0), style = MaterialTheme.typography.headlineMedium, color = Xp.Ice)
                     }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(if (detail) "Masquer le détail ▲" else "D'où vient « J'ai mis » ? ▼", style = MaterialTheme.typography.labelLarge, color = Xp.Cyan)
+                if (detail) {
+                    Spacer(Modifier.height(8.dp))
+                    val fmt = java.text.SimpleDateFormat("d MMM", java.util.Locale.FRANCE)
+                    a.capitalLines.forEach { c ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(c.label, style = MaterialTheme.typography.bodyMedium, color = Xp.Ice)
+                                Muted(fmt.format(java.util.Date(c.t)))
+                            }
+                            Text(Money.signedEur(c.eur, 2), style = MaterialTheme.typography.titleSmall, color = if (c.eur >= 0) Vivid.Sky else Feu.Orange)
+                        }
+                    }
+                    if (a.capitalLines.isEmpty()) Muted("Aucun mouvement lu depuis le départ.")
+                    Divider()
+                    Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+                        Text("Total « J'ai mis »", style = MaterialTheme.typography.titleSmall, color = Color.White, modifier = Modifier.weight(1f))
+                        Text(Money.eur(a.capital, 2), style = MaterialTheme.typography.titleSmall, color = Color.White)
+                    }
+                    if (a.capitalManual) Muted("Montant corrigé à la main dans les réglages.")
+                    Spacer(Modifier.height(4.dp))
+                    Muted("Lu chez Coinbase avec ta clé (lecture seule) : chaque virement et retrait en euros, et chaque crypto envoyée ou reçue, à sa valeur du jour. Les achats et ventes à l'intérieur de Coinbase ne comptent pas.")
                 }
             } else {
                 Spacer(Modifier.height(10.dp))
