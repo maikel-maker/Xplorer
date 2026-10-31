@@ -72,6 +72,18 @@ data class Analysis(
     val milestones: Milestones.Summary? = null,
 )
 
+/** Nombre de lundis dans le mois de [ms] (4 ou 5). */
+fun mondaysInMonth(ms: Long): Int {
+    val c = java.util.Calendar.getInstance().apply { timeInMillis = ms; set(java.util.Calendar.DAY_OF_MONTH, 1) }
+    val days = c.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+    var n = 0
+    for (d in 1..days) { c.set(java.util.Calendar.DAY_OF_MONTH, d); if (c.get(java.util.Calendar.DAY_OF_WEEK) == java.util.Calendar.MONDAY) n++ }
+    return n
+}
+
+/** Budget de la semaine : le budget du mois réparti sur ses lundis, arrondi à l'euro. */
+fun weeklyFromMonthly(monthly: Double, ms: Long): Double = kotlin.math.floor(monthly / mondaysInMonth(ms))
+
 /** Semaines commençant le lundi (le 1er janvier 1970 était un jeudi). */
 fun weekIndex(ms: Long): Long = Math.floorDiv(ms / 86_400_000L + 3, 7L)
 
@@ -115,7 +127,8 @@ object Analyzer {
         }
         // SnipeX : l'arène des agents répartit le budget de la semaine, en entier, entre les cryptos du plan.
         val week = weekIndex(now)
-        val weekly = budget ?: st.weeklyBudget
+        // 1 000 € par mois, pas un euro de plus : le mois est divisé par son nombre de lundis (4 → 250 €, 5 → 200 €).
+        val weekly = budget ?: weeklyFromMonthly(st.monthlyBudget, now)
         val mayer = universe.associateWith { sym -> SmartDca.mayer(s.daily[sym] ?: emptyList(), s.prices[sym] ?: Double.NaN, now) }
         val arena = universe.associateWith { sym -> Arena.debate(sym, s.daily[sym] ?: emptyList(), s.prices[sym] ?: Double.NaN) }
         val arenaPlan = Arena.plan(

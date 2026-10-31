@@ -105,6 +105,8 @@ fun LazyListScope.simpleHome(
                 .padding(22.dp),
         ) {
             Text("📅  Cette semaine · ${Money.eur(a.plan.budget, 0)}", style = MaterialTheme.typography.titleMedium, color = Xp.Gold)
+            val mondays = be.maikel.xplorer.core.mondaysInMonth(System.currentTimeMillis())
+            Muted("${Money.eur(a.snap.settings.monthlyBudget, 0)} ce mois-ci : $mondays achats de ${Money.eur(a.plan.budget, 0)}", small = false)
             Spacer(Modifier.height(10.dp))
             if (buys.isEmpty()) {
                 Text("Rien à acheter.", style = MaterialTheme.typography.titleLarge, color = Xp.Ice)
