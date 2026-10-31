@@ -8,7 +8,7 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 data class Settings(
-    val targets: Map<String, Double> = mapOf("BTC" to 0.50, "ETH" to 0.20, "GEOD" to 0.20, "LINK" to 0.05, "TAO" to 0.05),
+    val targets: Map<String, Double> = mapOf("BTC" to 0.50, "ETH" to 0.25, "GEOD" to 0.15, "LINK" to 0.05, "TAO" to 0.05),
     val watchlist: List<String> = listOf("SOL", "AKT", "NEAR"),
     val maxWeightDefault: Double = 0.5,
     val maxWeight: Map<String, Double> = emptyMap(),
@@ -54,6 +54,7 @@ class Prefs(context: Context) {
 
     /**
      * v2 (30/10/2026) : 225 € par semaine, répartis par l'arène, plus de réserve « creux ».
+     * v6 (31/10/2026) : cibles BTC 50 · ETH 25 · GEOD 15 · LINK 5 · TAO 5.
      * v5 (31/10/2026) : budget corrigé à 250 € par semaine (1 000 € par mois de 4 semaines).
      * v4 (30/10/2026) : KRL retiré ; cibles en chiffres ronds choisies par Maïkel (BTC 50 · ETH 20 · GEOD 20 · LINK 5 · TAO 5).
      */
@@ -69,6 +70,7 @@ class Prefs(context: Context) {
             dcaSchema = 4,
         )
         if (m.dcaSchema < 5) m = m.copy(weeklyBudget = 250.0, monthlyBudget = 1000.0, dcaSchema = 5)
+        if (m.dcaSchema < 6) m = m.copy(targets = Settings().targets, dcaSchema = 6)
         if (m != s) save(m)
         return m
     }

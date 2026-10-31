@@ -1,6 +1,6 @@
 # SnipeX
 
-App Android qui te dit chaque semaine quoi acheter avec tes 250 €. Six signaux (tendance, surchauffe, soldes, prix juste, élan, régularité) votent crypto par crypto, Bulls (vert) contre Bears (rouge), et leur verdict ajuste la répartition du budget (part × 0,5 à × 1,5). Cibles : BTC 50 · ETH 20 · GEOD 20 · LINK 5 · TAO 5. Le budget part toujours en entier : rien n'est gardé de côté.
+App Android qui te dit chaque semaine quoi acheter avec tes 250 €. Six signaux (tendance, surchauffe, soldes, prix juste, élan, régularité) votent crypto par crypto, Bulls (vert) contre Bears (rouge), et leur verdict ajuste la répartition du budget (part × 0,5 à × 1,5). Cibles : BTC 50 · ETH 25 · GEOD 15 · LINK 5 · TAO 5. Le budget part toujours en entier : rien n'est gardé de côté.
 
 Honnêteté : testée sur 8 ans (BTC, ETH, LINK, réglée sur la 1re moitié, vérifiée sur la 2e), l'arène fait jeu égal avec une répartition fixe. Elle rend la décision lisible et ludique, elle ne promet pas de battre le marché. L'app affiche son propre test sur le passé.
 
